@@ -4,7 +4,15 @@ import requests
 import sys
 import re
 
-token_bot = input('telegram token: ')
+token_bot = ''
+
+try: token_bot = open('apikey.txt').read()
+except: token_bot = input('telegram token: ')
+
+outf = open('apikey.txt', 'w')
+outf.write(token_bot)
+outf.close()
+
 API_key = ''
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
