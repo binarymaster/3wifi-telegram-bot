@@ -4,6 +4,7 @@ import requests
 import sys
 import re
 
+token_bot = input('telegram token: ')
 API_key = ''
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
@@ -29,6 +30,7 @@ def handler(message):
             elif re.match(bssid_pattern, tmp[1]) == None:
                 r = requests.get('http://3wifi.stascorp.com/api/apiquery?key={}&bssid=*&essid={}'.format(API_key, tmp[1]))
                 result = r.json()
+                if len(result['data']) > 0:
                     result = result['data']['*|{}'.format(tmp[1])]
                     for value in result:
                         bot.send_message(message.chat.id, 'essid: ' + value['essid'])
