@@ -14,11 +14,11 @@ except:
     outf.close()
 
 IP = ''
-try: TOKEN = open('IP.txt').read()
+try: IP = open('IP.txt').read()
 except:
-    TOKEN = input('IP for webhook: ')
+    IP = input('IP for webhook: ')
     outf = open('IP.txt', 'w')
-    outf.write(TOKEN)
+    outf.write(IP)
     outf.close()
 
 API_KEY = 'MHgONUzVP0KK3FGfV0HVEREHLsS6odc3'
