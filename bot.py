@@ -6,13 +6,20 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
 
 TOKEN = ''
-
 try: TOKEN = open('apikey.txt').read()
-except: TOKEN = input('telegram token: ')
+except:
+    TOKEN = input('telegram token: ')
+    outf = open('apikey.txt', 'w')
+    outf.write(TOKEN)
+    outf.close()
 
-outf = open('apikey.txt', 'w')
-outf.write(TOKEN)
-outf.close()
+IP = ''
+try: TOKEN = open('IP.txt').read()
+except:
+    TOKEN = input('IP for webhook: ')
+    outf = open('IP.txt', 'w')
+    outf.write(TOKEN)
+    outf.close()
 
 API_KEY = 'MHgONUzVP0KK3FGfV0HVEREHLsS6odc3'
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
@@ -96,6 +103,7 @@ def error(bot, update, error):
 
 
 updater = Updater(TOKEN)
+updater.start_webhook(listen='0.0.0.0', port=8443, url_path=TOKEN, key='private.key', cert='cert.pem', webhook_url=f'https://{IP}:8443/{TOKEN}')
 dp = updater.dispatcher
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
