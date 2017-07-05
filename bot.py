@@ -1,75 +1,106 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-import telebot
 import requests
-import sys
 import re
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+import logging
 
-token_bot = ''
+TOKEN = ''
 
-try: token_bot = open('apikey.txt').read()
-except: token_bot = input('telegram token: ')
+try: TOKEN = open('apikey.txt').read()
+except: TOKEN = input('telegram token: ')
 
 outf = open('apikey.txt', 'w')
-outf.write(token_bot)
+outf.write(TOKEN)
 outf.close()
 
-API_key = ''
+API_KEY = 'MHgONUzVP0KK3FGfV0HVEREHLsS6odc3'
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
-bot = telebot.TeleBot(token_bot)
-
-@bot.message_handler(content_types=["text"])
-def handler(message):
-    try:
-        tmp = message.text.split()
-        if tmp[0] == '/help': bot.send_message(message.chat.id, "3wifi.stascorp.com бот!\n/pw bssid/essid - поиск пароля и wps пина по мак адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear)\nwps /bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)")
-        elif len(tmp) == 2:
-            if tmp[0] == '/pw' and re.match(bssid_pattern, tmp[1]) != None:
-                r = requests.get('https://3wifi.stascorp.com/api/apiquery?key={}&bssid={}'.format(API_key, tmp[1]))
-                result = r.json()
-                if len(result['data']) > 0:
-                    result = result['data'][tmp[1].upper()]
-                    for value in result:
-                        bot.send_message(message.chat.id, 'ESSID: ' + value['essid'])
-                        bot.send_message(message.chat.id, value['key'])
-                        if value['wps'] != '': bot.send_message(message.chat.id, 'wps pin: ' + value['wps'])
-                        else: bot.send_message(message.chat.id, '<нет WPS пина>')
-                else: bot.send_message(message.chat.id, 'Нет результатов :(')
-            elif re.match(bssid_pattern, tmp[1]) == None:
-                r = requests.get('https://3wifi.stascorp.com/api/apiquery?key={}&bssid=*&essid={}'.format(API_key, tmp[1]))
-                result = r.json()
-                if len(result['data']) > 0:
-                    result = result['data']['*|{}'.format(tmp[1])]
-                    for value in result:
-                        bot.send_message(message.chat.id, 'essid: ' + value['essid'])
-                        if value['bssid'] != '': bot.send_message(message.chat.id, 'bssid: ' + value['bssid'])
-                        else: bot.send_message(message.chat.id, 'bssid: <нет bssid>')
-                        bot.send_message(message.chat.id, 'key:')
-                        bot.send_message(message.chat.id, value['key'])
-                        if value['wps'] != '': bot.send_message(message.chat.id, 'wps pin: ' + value['wps'])
-                        else: bot.send_message(message.chat.id, '<нет WPS пина>')
-                else: bot.send_message(message.chat.id, 'Нет результатов :(')
-            elif tmp[0] == '/wps':
-                r = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_key, tmp[1]))
-                result = r.json()
-                if len(result['data']) > 0:
-                    result = result['data'][tmp[1].upper()]['scores']
-                    for value in result:
-                        bot.send_message(message.chat.id, 'Name: ' + value['name'])
-                        bot.send_message(message.chat.id, value['value'])
-                        bot.send_message(message.chat.id, 'Score: ' + str(value['score']))
-                else: bot.send_message(message.chat.id, 'Нет результатов :(')
-        else: bot.send_message(message.chat.id, 'Команда не найдена :( Отправь "/help" для получения списка команд')
-    except: bot.send_message(message.chat.id, 'Произошла ошибка :( Жди, когда 3wifi заработает. Если же он работает - отпиши автору о баге')
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-while API_key == '':
-    try:
-        r = requests.post('https://3wifi.stascorp.com/api/apikeys', data = {'login':'antichat', 'password':'antichat'})
-        result = r.json()
-        if result['result']: API_key = result['data'][0]['key']
-    except: print('Problem with 3wifi')
-print("API key is " + API_key)
+def text(bot, update): update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
 
-bot.polling(none_stop=True)
+def help(bot, update):
+    update.message.reply_text(f'''3wifi.stascorp.com бот!
+/pw bssid и/или essid - поиск по мак адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
+/wps bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)''')
+
+def pw(bot, update):
+    answer='Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
+    tmp = update.message.text.split()
+    if len(tmp) == 2:
+        if re.match(bssid_pattern, tmp[1]) != None:
+            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
+            if len(results['data']) == 0: answer='Нет результатов :('
+            else:
+                answer=''
+                values = results['data'][f'{tmp[1]}'.upper()]
+                for value in values:
+                    answer+=f"""ESSID: `{value['essid']}`
+BSSID: `{value['bssid']}`
+Password: `{value['key']}`
+WPS pin: `{value['wps']}`
+Time: {value['time']}
+- - - - -
+"""
+        else:
+            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}').json()
+            if len(results['data']) == 0: answer='Нет результатов :('
+            if len(results['data']) == 1:
+                values = results['data'][f'*|{tmp[1]}']
+                for value in values:
+                    answer=f"""ESSID: `{value['essid']}`
+BSSID: `{value['bssid']}`
+Password: `{value['key']}`
+WPS pin: `{value['wps']}`
+Time: {value['time']}
+- - - - -
+"""
+    elif len(tmp) == 3:
+        if re.match(bssid_pattern, tmp[1]) != None:
+            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}').json()    
+            if len(results['data']) == 0: answer='Нет результатов :('
+            if len(results['data']) == 1:
+                values = results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0]
+                answer=f"""ESSID: `{values['essid']}`
+BSSID: `{values['bssid']}`
+Password: `{values['key']}`
+WPS pin: `{values['wps']}`
+Time: {values['time']}
+"""
+    else: answer='Поиск по bssid и essid выполняется так: /pw bssid essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
+    update.message.reply_text(answer, parse_mode='Markdown')
+
+def wps(bot, update):
+    answer='Поиск wps пин кодов выполняется так: /wps bssid (пример: /wps FF:FF:FF:FF:FF:FF)'
+    tmp = update.message.text.split()
+    if len(tmp) == 2:
+        if re.match(bssid_pattern, tmp[1]) != None:
+            results = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_KEY, tmp[1])).json()
+            if len(results['data']) > 0:
+                answer=''
+                for result in results['data'][tmp[1].upper()]['scores']:
+                    answer+=f"""Name: `{result['name']}`
+Pin: `{result['value']}`
+Score: {result['score']}
+"""
+            else: answer = 'Нет результатов :('
+    update.message.reply_text(answer, parse_mode='Markdown')
+
+def error(bot, update, error):
+    logger.warn('Update "%s" caused error "%s"' % (update, error))
+
+
+
+updater = Updater(TOKEN)
+dp = updater.dispatcher
+dp.add_handler(CommandHandler("help", help))
+dp.add_handler(CommandHandler("start", help))
+dp.add_handler(CommandHandler("wps", wps))
+dp.add_handler(CommandHandler("pw", pw))
+dp.add_handler(MessageHandler(Filters.text, text))
+dp.add_error_handler(error)
+updater.start_polling(poll_interval=.5)
