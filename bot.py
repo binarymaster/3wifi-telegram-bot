@@ -111,5 +111,5 @@ dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
 dp.add_handler(MessageHandler(Filters.text, text))
 dp.add_error_handler(error)
-updater.start_webhook(listen='0.0.0.0', port=8443, url_path=TOKEN, key='private.key', cert='cert.pem', webhook_url=f'https://{IP}:8443/{TOKEN}') #закоменти эту строчку и открой следующую для пуллинга, вместо сервера
-#updater.start_polling(poll_interval=.5)
+if IP == 'no': updater.start_polling(poll_interval=.5)
+else: updater.start_webhook(listen='0.0.0.0', port=8443, url_path=TOKEN, key='private.key', cert='cert.pem', webhook_url=f'https://{IP}:8443/{TOKEN}') #закоменти эту строчку и открой следующую для пуллинга, вместо сервера
