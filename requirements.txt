@@ -1,3 +1,1 @@
-pyTelegramBotAPI==2.3.2
-requests==2.13.0
-selenium==3.3.2
+python-telegram-bot==6.1.0
