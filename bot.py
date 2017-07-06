@@ -39,11 +39,11 @@ def pw(bot, update):
     answer='Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     tmp = update.message.text.split()
     if len(tmp) == 2:
+        answer=''
         if re.match(bssid_pattern, tmp[1]) != None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             else:
-                answer=''
                 values = results['data'][f'{tmp[1]}'.upper()]
                 for value in values:
                     answer+=f"""ESSID: `{value['essid']}`
@@ -59,7 +59,7 @@ Time: {value['time']}
             if len(results['data']) == 1:
                 values = results['data'][f'*|{tmp[1]}']
                 for value in values:
-                    answer=f"""ESSID: `{value['essid']}`
+                    answer+=f"""ESSID: `{value['essid']}`
 BSSID: `{value['bssid']}`
 Password: `{value['key']}`
 WPS pin: `{value['wps']}`
@@ -79,6 +79,52 @@ WPS pin: `{values['wps']}`
 Time: {values['time']}
 """
     else: answer='Поиск по bssid и essid выполняется так: /pw bssid essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
+    update.message.reply_text(answer, parse_mode='Markdown')
+
+def pws(bot, update):
+    answer='Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pws bssid/essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
+    tmp = update.message.text.split()
+    if len(tmp) == 2:
+        answer=''
+        if re.match(bssid_pattern, tmp[1]) != None:
+            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
+            if len(results['data']) == 0: answer='Нет результатов :('
+            else:
+                values = results['data'][f'{tmp[1]}'.upper()]
+                for value in values:
+                    answer+=f"""ESSID: `{value['essid']}`
+BSSID: `{value['bssid']}`
+Password: `{value['key']}`
+WPS pin: `{value['wps']}`
+Time: {value['time']}
+- - - - -
+"""
+        else:
+            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}&sens=true').json()
+            if len(results['data']) == 0: answer='Нет результатов :('
+            else:
+                values = results['data'][f'*|{tmp[1]}']
+                for value in values:
+                    answer+=f"""ESSID: `{value['essid']}`
+BSSID: `{value['bssid']}`
+Password: `{value['key']}`
+WPS pin: `{value['wps']}`
+Time: {value['time']}
+- - - - -
+"""
+    elif len(tmp) == 3:
+        if re.match(bssid_pattern, tmp[1]) != None:
+            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}&sens=true').json()    
+            if len(results['data']) == 0: answer='Нет результатов :('
+            if len(results['data']) == 1:
+                values = results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0]
+                answer=f"""ESSID: `{values['essid']}`
+BSSID: `{values['bssid']}`
+Password: `{values['key']}`
+WPS pin: `{values['wps']}`
+Time: {values['time']}
+"""
+    else: answer='Поиск по bssid и essid выполняется так: /pws bssid essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
 def wps(bot, update):
@@ -109,6 +155,7 @@ dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
 dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
+dp.add_handler(CommandHandler("pws", pws))
 dp.add_handler(MessageHandler(Filters.text, text))
 dp.add_error_handler(error)
 if IP == 'no': updater.start_polling(poll_interval=.5)
