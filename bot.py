@@ -33,6 +33,7 @@ def text(bot, update): update.message.reply_text('Команда не найде
 def help(bot, update):
     update.message.reply_text(f'''3wifi.stascorp.com бот!
 /pw bssid и/или essid - поиск по мак адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
+/pws - /pw, но с учётом регистра (essid)
 /wps bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)''')
 
 def pw(bot, update):
@@ -159,4 +160,4 @@ dp.add_handler(CommandHandler("pws", pws))
 dp.add_handler(MessageHandler(Filters.text, text))
 dp.add_error_handler(error)
 if IP == 'no': updater.start_polling(poll_interval=.5)
-else: updater.start_webhook(listen='0.0.0.0', port=8443, url_path=TOKEN, key='private.key', cert='cert.pem', webhook_url=f'https://{IP}:8443/{TOKEN}') #закоменти эту строчку и открой следующую для пуллинга, вместо сервера
+else: updater.start_webhook(listen='0.0.0.0', port=8443, url_path=TOKEN, key='private.key', cert='cert.pem', webhook_url=f'https://{IP}:8443/{TOKEN}')
