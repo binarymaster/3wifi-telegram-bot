@@ -143,7 +143,10 @@ Score: {result['score']}
 - - - - -
 """
             else: answer = 'Нет результатов :('
-    update.message.reply_text(answer, parse_mode='Markdown')
+    if len(answer) > 3900:
+        print(answer[:3900])
+        update.message.reply_text(answer[:3900] + '\nСписок слишком большой, смотри дальше на 3wifi.stascorp.com', parse_mode='Markdown')
+    else: update.message.reply_text(answer, parse_mode='Markdown')
 
 def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
