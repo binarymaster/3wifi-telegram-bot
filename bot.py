@@ -41,7 +41,7 @@ def pw(bot, update):
     tmp = update.message.text.split()
     if len(tmp) == 2:
         answer=''
-        if re.match(bssid_pattern, tmp[1]) != None:
+        if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             else:
@@ -52,8 +52,11 @@ BSSID: `{value['bssid']}`
 Password: `{value['key']}`
 WPS pin: `{value['wps']}`
 Time: {value['time']}
-- - - - -
 """
+                    if 'lat' in value:
+                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
+                    else:
+                        answer+='- - - - -\n'
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
@@ -65,10 +68,13 @@ BSSID: `{value['bssid']}`
 Password: `{value['key']}`
 WPS pin: `{value['wps']}`
 Time: {value['time']}
-- - - - -
 """
+                    if 'lat' in value:
+                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
+                    else:
+                        answer+='- - - - -\n'
     elif len(tmp) == 3:
-        if re.match(bssid_pattern, tmp[1]) != None:
+        if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}').json()    
             if len(results['data']) == 0: answer='Нет результатов :('
             if len(results['data']) == 1:
@@ -79,6 +85,11 @@ Password: `{values['key']}`
 WPS pin: `{values['wps']}`
 Time: {values['time']}
 """
+                if 'lat' in values:
+                    answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={values['lat']}&lon={values['lon']})\n"
+                else:
+                    answer+='- - - - -\n'
+                    
     else: answer='Поиск по bssid и essid выполняется так: /pw bssid essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
@@ -87,7 +98,7 @@ def pws(bot, update):
     tmp = update.message.text.split()
     if len(tmp) == 2:
         answer=''
-        if re.match(bssid_pattern, tmp[1]) != None:
+        if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             else:
@@ -98,8 +109,11 @@ BSSID: `{value['bssid']}`
 Password: `{value['key']}`
 WPS pin: `{value['wps']}`
 Time: {value['time']}
-- - - - -
 """
+                    if 'lat' in value:
+                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
+                    else:
+                        answer+='- - - - -\n'
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}&sens=true').json()
             if len(results['data']) == 0: answer='Нет результатов :('
@@ -111,10 +125,13 @@ BSSID: `{value['bssid']}`
 Password: `{value['key']}`
 WPS pin: `{value['wps']}`
 Time: {value['time']}
-- - - - -
 """
+                    if 'lat' in value:
+                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
+                    else:
+                        answer+='- - - - -\n'
     elif len(tmp) == 3:
-        if re.match(bssid_pattern, tmp[1]) != None:
+        if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}&sens=true').json()    
             if len(results['data']) == 0: answer='Нет результатов :('
             if len(results['data']) == 1:
@@ -125,6 +142,10 @@ Password: `{values['key']}`
 WPS pin: `{values['wps']}`
 Time: {values['time']}
 """
+                if 'lat' in values:
+                    answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={values['lat']}&lon={values['lon']})\n"
+                else:
+                        answer+='- - - - -\n'
     else: answer='Поиск по bssid и essid выполняется так: /pws bssid essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
@@ -132,7 +153,7 @@ def wps(bot, update):
     answer='Поиск wps пин кодов выполняется так: /wps bssid (пример: /wps FF:FF:FF:FF:FF:FF)'
     tmp = update.message.text.split()
     if len(tmp) == 2:
-        if re.match(bssid_pattern, tmp[1]) != None:
+        if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_KEY, tmp[1])).json()
             if len(results['data']) > 0:
                 answer=''
