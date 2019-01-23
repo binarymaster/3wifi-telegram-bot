@@ -21,7 +21,14 @@ except:
     outf.write(IP)
     outf.close()
 
-API_KEY = 'MHgONUzVP0KK3FGfV0HVEREHLsS6odc3'
+API_KEY = ''
+try: API_KEY = open('3wifiapi.txt').read()
+except:
+    API_KEY = input('3WiFi API read key: ')
+    outf = open('3wifiapi.txt', 'w')
+    outf.write(API_KEY)
+    outf.close()
+
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
