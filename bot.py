@@ -55,6 +55,11 @@ def printaps(values):
         answer += printap(value)
     return answer
 
+def CheckAPresponse(data):
+    if len(data['data']) == 0:
+        return 'Нет результатов :('
+    return ''
+
 def pw(bot, update):
     answer='Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     tmp = update.message.text.split()
@@ -62,19 +67,19 @@ def pw(bot, update):
         answer=''
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
-            if len(results['data']) == 0: answer='Нет результатов :('
-            else:
+            answer = CheckAPresponse(results)
+            if answer == '':
                 answer = printaps(results['data'][f'{tmp[1]}'.upper()])
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}').json()
-            if len(results['data']) == 0: answer='Нет результатов :('
-            if len(results['data']) == 1:
+            answer = CheckAPresponse(results)
+            if answer == '' and len(results['data']) == 1:
                 answer = printaps(results['data'][f'*|{tmp[1]}'])
     elif len(tmp) == 3:
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}').json()    
-            if len(results['data']) == 0: answer='Нет результатов :('
-            if len(results['data']) == 1:
+            answer = CheckAPresponse(results)
+            if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else: answer='Поиск по bssid и essid выполняется так: /pw bssid essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
@@ -86,19 +91,19 @@ def pws(bot, update):
         answer=''
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
-            if len(results['data']) == 0: answer='Нет результатов :('
-            else:
+            answer = CheckAPresponse(results)
+            if answer == '':
                 answer = printaps(results['data'][f'{tmp[1]}'.upper()])
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}&sens=true').json()
-            if len(results['data']) == 0: answer='Нет результатов :('
-            else:
+            answer = CheckAPresponse(results)
+            if answer == '':
                 answer = printaps(results['data'][f'*|{tmp[1]}'])
     elif len(tmp) == 3:
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}&sens=true').json()    
-            if len(results['data']) == 0: answer='Нет результатов :('
-            if len(results['data']) == 1:
+            answer = CheckAPresponse(results)
+            if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else: answer='Поиск по bssid и essid выполняется так: /pws bssid essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
