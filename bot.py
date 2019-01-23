@@ -129,9 +129,16 @@ def wps(bot, update):
             if len(results['data']) > 0:
                 answer=''
                 for result in results['data'][tmp[1].upper()]['scores']:
+                    result['score'] *= 100
+                    if result['score'] < 1:
+                        score = "{0:.2f}".format(result['score'])
+                    elif result['score'] < 10:
+                        score = "{0:.1f}".format(result['score'])
+                    else:
+                        score = str(round(result['score']))
                     answer+=f"""Name: `{result['name']}`
 Pin: `{result['value']}`
-Score: {result['score']}
+Score: {score}%
 - - - - -
 """
             else: answer = 'Нет результатов :('
