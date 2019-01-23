@@ -36,6 +36,25 @@ def help(bot, update):
 /pws - /pw, но с учётом регистра (essid)
 /wps bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)''')
 
+def printap(value):
+    answer = f"""ESSID: `{value['essid']}`
+BSSID: `{value['bssid']}`
+Password: `{value['key']}`
+WPS pin: `{value['wps']}`
+Time: {value['time']}
+"""
+    if 'lat' in value:
+        answer += f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
+    else:
+        answer += '- - - - -\n'
+    return answer
+
+def printaps(values):
+    answer = ''
+    for value in values:
+        answer += printap(value)
+    return answer
+
 def pw(bot, update):
     answer='Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     tmp = update.message.text.split()
@@ -45,51 +64,18 @@ def pw(bot, update):
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             else:
-                values = results['data'][f'{tmp[1]}'.upper()]
-                for value in values:
-                    answer+=f"""ESSID: `{value['essid']}`
-BSSID: `{value['bssid']}`
-Password: `{value['key']}`
-WPS pin: `{value['wps']}`
-Time: {value['time']}
-"""
-                    if 'lat' in value:
-                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
-                    else:
-                        answer+='- - - - -\n'
+                answer = printaps(results['data'][f'{tmp[1]}'.upper()])
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             if len(results['data']) == 1:
-                values = results['data'][f'*|{tmp[1]}']
-                for value in values:
-                    answer+=f"""ESSID: `{value['essid']}`
-BSSID: `{value['bssid']}`
-Password: `{value['key']}`
-WPS pin: `{value['wps']}`
-Time: {value['time']}
-"""
-                    if 'lat' in value:
-                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
-                    else:
-                        answer+='- - - - -\n'
+                answer = printaps(results['data'][f'*|{tmp[1]}'])
     elif len(tmp) == 3:
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}').json()    
             if len(results['data']) == 0: answer='Нет результатов :('
             if len(results['data']) == 1:
-                values = results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0]
-                answer=f"""ESSID: `{values['essid']}`
-BSSID: `{values['bssid']}`
-Password: `{values['key']}`
-WPS pin: `{values['wps']}`
-Time: {values['time']}
-"""
-                if 'lat' in values:
-                    answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={values['lat']}&lon={values['lon']})\n"
-                else:
-                    answer+='- - - - -\n'
-                    
+                answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else: answer='Поиск по bssid и essid выполняется так: /pw bssid essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
@@ -102,50 +88,18 @@ def pws(bot, update):
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             else:
-                values = results['data'][f'{tmp[1]}'.upper()]
-                for value in values:
-                    answer+=f"""ESSID: `{value['essid']}`
-BSSID: `{value['bssid']}`
-Password: `{value['key']}`
-WPS pin: `{value['wps']}`
-Time: {value['time']}
-"""
-                    if 'lat' in value:
-                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
-                    else:
-                        answer+='- - - - -\n'
+                answer = printaps(results['data'][f'{tmp[1]}'.upper()])
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}&sens=true').json()
             if len(results['data']) == 0: answer='Нет результатов :('
             else:
-                values = results['data'][f'*|{tmp[1]}']
-                for value in values:
-                    answer+=f"""ESSID: `{value['essid']}`
-BSSID: `{value['bssid']}`
-Password: `{value['key']}`
-WPS pin: `{value['wps']}`
-Time: {value['time']}
-"""
-                    if 'lat' in value:
-                        answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
-                    else:
-                        answer+='- - - - -\n'
+                answer = printaps(results['data'][f'*|{tmp[1]}'])
     elif len(tmp) == 3:
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}&sens=true').json()    
             if len(results['data']) == 0: answer='Нет результатов :('
             if len(results['data']) == 1:
-                values = results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0]
-                answer=f"""ESSID: `{values['essid']}`
-BSSID: `{values['bssid']}`
-Password: `{values['key']}`
-WPS pin: `{values['wps']}`
-Time: {values['time']}
-"""
-                if 'lat' in values:
-                    answer+=f"[Точка на карте](http://3wifi.stascorp.com/map?lat={values['lat']}&lon={values['lon']})\n"
-                else:
-                        answer+='- - - - -\n'
+                answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else: answer='Поиск по bssid и essid выполняется так: /pws bssid essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
