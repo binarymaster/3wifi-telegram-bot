@@ -56,6 +56,11 @@ def printaps(values):
     return answer
 
 def CheckAPresponse(data):
+    if data['result'] == 0:
+        if data['error'] == 'cooldown':
+            return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
+        else:
+            return 'Что-то пошло не так 😮 error: ' + data['error']
     if len(data['data']) == 0:
         return 'Нет результатов :('
     return ''
