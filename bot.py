@@ -6,6 +6,9 @@ import logging
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
+USER_KEYS_DB_FILENAME = 'userkeys.json'
+
+# Initializing settings
 try:
     with open('config.json', 'r', encoding='utf-8') as file:
         config = json.load(file)
@@ -25,6 +28,15 @@ except FileNotFoundError:
     with open('config.json', 'w', encoding='utf-8') as outf:
         json.dump(config, outf, indent=4)
 
+# Initializing user API keys database
+try:
+    with open(USER_KEYS_DB_FILENAME, 'r', encoding='utf-8') as file:
+        USER_KEYS = json.load(file)
+except FileNotFoundError:
+    USER_KEYS = dict()
+    with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
+        json.dump(USER_KEYS, outf, indent=4)
+
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
 logging.basicConfig(
@@ -41,7 +53,8 @@ def help(bot, update):
     update.message.reply_text(f'''3wifi.stascorp.com бот!
 /pw bssid и/или essid - поиск по мак адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
 /pws - /pw, но с учётом регистра (essid)
-/wps bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)''')
+/wps bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)
+/authorize login:password - авторизоваться с личным аккаунтом 3WiFi для снятия временных ограничений бота''')
 
 
 def printap(value):
@@ -76,8 +89,41 @@ def CheckAPresponse(data):
     return ''
 
 
+def authorize(bot, update):
+    answer = 'Авторизация выполняется так: /authorize login:password'
+    tmp = update.message.text.split()
+    if len(tmp) == 2:
+        arg = tmp[1]
+        tmp = arg.split(':')
+        if len(tmp) == 2:
+            login, password = tmp
+            r = requests.post(f'https://3wifi.stascorp.com/api/apikeys', data={'login': login, 'password': password}).json()
+            if r['result']:
+                user_id = str(update.message.from_user.id)
+                nickname = r['profile']['nick']
+                apikey = list(filter(lambda x: x['access'] == 'read', r['data']))[0]['key']
+                USER_KEYS[user_id] = apikey
+                with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
+                    json.dump(USER_KEYS, outf, indent=4)
+                answer = 'Вы успешно авторизованы как *{}*'.format(nickname)
+            elif r['error'] == 'loginfail':
+                answer = 'Ошибка - проверьте логин и пароль'
+            else:
+                answer = 'Что-то пошло не так 😮 error: {}'.format(r['error'])
+    update.message.reply_text(answer, parse_mode='Markdown')
+
+
+def getPersonalAPIkey(user_id):
+    user_id = str(user_id)
+    if user_id in USER_KEYS:
+        return USER_KEYS[user_id]
+    else:
+        return API_KEY
+
+
 def pw(bot, update):
     answer = 'Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
+    API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     if len(tmp) == 2:
         answer = ''
@@ -104,6 +150,7 @@ def pw(bot, update):
 
 def pws(bot, update):
     answer = 'Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pws bssid/essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
+    API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     if len(tmp) == 2:
         answer = ''
@@ -130,6 +177,7 @@ def pws(bot, update):
 
 def wps(bot, update):
     answer = 'Поиск wps пин кодов выполняется так: /wps bssid (пример: /wps FF:FF:FF:FF:FF:FF)'
+    API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     if len(tmp) == 2:
         if re.match(bssid_pattern, tmp[1]) is not None:
@@ -165,6 +213,7 @@ updater = Updater(TOKEN)
 dp = updater.dispatcher
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
+dp.add_handler(CommandHandler("authorize", authorize))
 dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
 dp.add_handler(CommandHandler("pws", pws))
