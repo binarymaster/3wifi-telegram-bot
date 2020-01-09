@@ -1,36 +1,29 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-import requests
+import json
 import re
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
+import requests
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-TOKEN = ''
 try:
-    TOKEN = open('apikey.txt').read()
+    with open('config.json', 'r', encoding='utf-8') as file:
+        config = json.load(file)
+        TOKEN = config['bot_token']
+        IP = config['webhook_ip']
+        API_KEY = config['3wifi_apikey']
 except FileNotFoundError:
-    TOKEN = input('telegram token: ')
-    outf = open('apikey.txt', 'w')
-    outf.write(TOKEN)
-    outf.close()
-
-IP = ''
-try:
-    IP = open('IP.txt').read()
-except FileNotFoundError:
+    print('Please provide the following credentials')
+    TOKEN = input('Telegram bot API token: ')
     IP = input('IP for webhook: ')
-    outf = open('IP.txt', 'w')
-    outf.write(IP)
-    outf.close()
-
-API_KEY = ''
-try:
-    API_KEY = open('3wifiapi.txt').read()
-except FileNotFoundError:
     API_KEY = input('3WiFi API read key: ')
-    outf = open('3wifiapi.txt', 'w')
-    outf.write(API_KEY)
-    outf.close()
+    config = {
+        'bot_token': TOKEN,
+        'webhook_ip': IP,
+        '3wifi_apikey': API_KEY
+    }
+    with open('config.json', 'w', encoding='utf-8') as outf:
+        json.dump(config, outf, indent=4)
 
 bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
