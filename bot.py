@@ -192,7 +192,6 @@ def pws(update, context):
 
 def wps(update, context):
     answer = 'Поиск wps пин кодов выполняется так: /wps bssid (пример: /wps FF:FF:FF:FF:FF:FF)'
-    API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     if len(tmp) == 2:
         if re.match(bssid_pattern, tmp[1]) is not None:
