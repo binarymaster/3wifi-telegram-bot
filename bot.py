@@ -45,11 +45,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def text(bot, update):
+def text(update, context):
     update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
 
 
-def help(bot, update):
+def help(update, context):
     update.message.reply_text(f'''3wifi.stascorp.com бот!
 /pw bssid и/или essid - поиск по мак адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
 /pws - /pw, но с учётом регистра (essid)
@@ -89,7 +89,7 @@ def CheckAPresponse(data):
     return ''
 
 
-def authorize(bot, update):
+def authorize(update, context):
     answer = 'Авторизация выполняется так: /authorize login:password'
     tmp = update.message.text.split()
     if len(tmp) == 2:
@@ -121,7 +121,7 @@ def getPersonalAPIkey(user_id):
         return API_KEY
 
 
-def pw(bot, update):
+def pw(update, context):
     answer = 'Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
@@ -148,7 +148,7 @@ def pw(bot, update):
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
-def pws(bot, update):
+def pws(update, context):
     answer = 'Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pws bssid/essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
@@ -175,7 +175,7 @@ def pws(bot, update):
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
-def wps(bot, update):
+def wps(update, context):
     answer = 'Поиск wps пин кодов выполняется так: /wps bssid (пример: /wps FF:FF:FF:FF:FF:FF)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
@@ -205,11 +205,11 @@ Score: {score}%
         update.message.reply_text(answer, parse_mode='Markdown')
 
 
-def error(bot, update, error):
-    logger.warn('Update "%s" caused error "%s"' % (update, error))
+def error(update, context):
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 
-updater = Updater(TOKEN)
+updater = Updater(TOKEN, use_context=True)
 dp = updater.dispatcher
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
