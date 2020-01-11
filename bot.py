@@ -82,6 +82,8 @@ def CheckAPresponse(data):
     if data['result'] == 0:
         if data['error'] == 'cooldown':
             return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
+        elif data['error'] == 'loginfail':
+            return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /authorize, попробуйте сделать это снова или выйдите с помощью /logout'
         else:
             return 'Что-то пошло не так 😮 error: ' + data['error']
     if len(data['data']) == 0:
@@ -105,12 +107,25 @@ def authorize(update, context):
                 USER_KEYS[user_id] = apikey
                 with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
                     json.dump(USER_KEYS, outf, indent=4)
-                answer = 'Вы успешно авторизованы как *{}*'.format(nickname)
+                answer = 'Вы успешно авторизованы как *{}*. Чтобы выйти, отправьте /logout'.format(nickname)
             elif r['error'] == 'loginfail':
                 answer = 'Ошибка - проверьте логин и пароль'
             else:
                 answer = 'Что-то пошло не так 😮 error: {}'.format(r['error'])
     update.message.reply_text(answer, parse_mode='Markdown')
+
+
+def logout(update, context):
+    user_id = str(update.message.from_user.id)
+    try:
+        USER_KEYS.pop(user_id)
+        with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
+            json.dump(USER_KEYS, outf, indent=4)
+    except KeyError:
+        answer = 'Ошибка: невозможно выйти из аккаунта 3WiFi, т.к. вы не вошли'
+    else:
+        answer = 'Токен вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /authorize'
+    update.message.reply_text(answer)
 
 
 def getPersonalAPIkey(user_id):
@@ -214,6 +229,7 @@ dp = updater.dispatcher
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
 dp.add_handler(CommandHandler("authorize", authorize))
+dp.add_handler(CommandHandler("logout", logout))
 dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
 dp.add_handler(CommandHandler("pws", pws))
