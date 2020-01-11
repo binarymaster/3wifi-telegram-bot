@@ -45,7 +45,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def text(update, context):
+def unknown(update, context):
     update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
 
 
@@ -217,7 +217,7 @@ dp.add_handler(CommandHandler("authorize", authorize))
 dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
 dp.add_handler(CommandHandler("pws", pws))
-dp.add_handler(MessageHandler(Filters.text, text))
+dp.add_handler(MessageHandler(Filters.text | Filters.command, unknown))
 dp.add_error_handler(error)
 if IP == 'no':
     updater.start_polling(poll_interval=.5)
