@@ -100,23 +100,26 @@ def authorize(update, context):
         tmp = arg.split(':')
         if len(tmp) == 2:
             login, password = tmp
-            r = requests.post(f'https://3wifi.stascorp.com/api/apikeys', data={'login': login, 'password': password}).json()
+            r = requests.post('https://3wifi.stascorp.com/api/apikeys', data={'login': login, 'password': password}).json()
             if r['result']:
-                user_id = str(update.message.from_user.id)
-                nickname = r['profile']['nick']
-                apikey = list(filter(lambda x: x['access'] == 'read', r['data']))[0]['key']
-                USER_KEYS[user_id] = apikey
-                with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
-                    json.dump(USER_KEYS, outf, indent=4)
-                answer = 'Вы успешно авторизованы как *{}*. Чтобы выйти, отправьте /logout'.format(nickname)
-                # Send security notification to users with the same token
-                for telegram_id, api_key in USER_KEYS.items():
-                    if (apikey == api_key) and (telegram_id != user_id) and (api_key != API_KEY):
-                        bot.send_message(
-                            chat_id=telegram_id,
-                            text='*Уведомление безопасности*\n[Пользователь](tg://user?id={}) только что авторизовался в боте с вашим аккаунтом 3WiFi.'.format(user_id),
-                            parse_mode='Markdown'
-                            )
+                if r['profile']['level'] > 0:
+                    user_id = str(update.message.from_user.id)
+                    nickname = r['profile']['nick']
+                    apikey = list(filter(lambda x: x['access'] == 'read', r['data']))[0]['key']
+                    USER_KEYS[user_id] = apikey
+                    with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
+                        json.dump(USER_KEYS, outf, indent=4)
+                    answer = 'Вы успешно авторизованы как *{}*. Чтобы выйти, отправьте /logout'.format(nickname)
+                    # Send security notification to users with the same token
+                    for telegram_id, api_key in USER_KEYS.items():
+                        if (apikey == api_key) and (telegram_id != user_id) and (api_key != API_KEY):
+                            bot.send_message(
+                                chat_id=telegram_id,
+                                text='*Уведомление безопасности*\n[Пользователь](tg://user?id={}) только что авторизовался в боте с вашим аккаунтом 3WiFi.'.format(user_id),
+                                parse_mode='Markdown'
+                                )
+                else:
+                    answer = 'Ошибка: уровень доступа аккаунта ниже уровня "пользователь"'
             elif r['error'] == 'loginfail':
                 answer = 'Ошибка - проверьте логин и пароль'
             else:
