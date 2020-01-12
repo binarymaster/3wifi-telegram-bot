@@ -52,17 +52,17 @@ def unknown(update, context):
 
 def help(update, context):
     update.message.reply_text(f'''3wifi.stascorp.com бот!
-/pw bssid и/или essid - поиск по мак адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
-/pws - /pw, но с учётом регистра (essid)
-/wps bssid - поиск wps пина по мак адресу (пример: /wps FF:FF:FF:FF:FF:FF)
-/authorize login:password - авторизоваться с личным аккаунтом 3WiFi для снятия временных ограничений бота''')
+/pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
+/pws — /pw, но с учётом регистра (ESSID)
+/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)
+/authorize login:password — авторизоваться с личным аккаунтом 3WiFi для снятия временных ограничений на поиск''')
 
 
 def printap(value):
     answer = f"""ESSID: `{value['essid']}`
 BSSID: `{value['bssid']}`
 Password: `{value['key']}`
-WPS pin: `{value['wps']}`
+WPS PIN: `{value['wps']}`
 Time: {value['time']}
 """
     if 'lat' in value:
@@ -119,9 +119,9 @@ def authorize(update, context):
                                 parse_mode='Markdown'
                                 )
                 else:
-                    answer = 'Ошибка: уровень доступа аккаунта ниже уровня "пользователь"'
+                    answer = 'Ошибка: уровень доступа аккаунта ниже уровня *пользователь*'
             elif r['error'] == 'loginfail':
-                answer = 'Ошибка - проверьте логин и пароль'
+                answer = 'Ошибка — проверьте логин и пароль'
             else:
                 answer = 'Что-то пошло не так 😮 error: {}'.format(r['error'])
     update.message.reply_text(answer, parse_mode='Markdown')
@@ -136,7 +136,7 @@ def logout(update, context):
     except KeyError:
         answer = 'Ошибка: невозможно выйти из аккаунта 3WiFi, т.к. вы не вошли'
     else:
-        answer = 'Токен вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /authorize'
+        answer = 'API-ключ вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /authorize'
     update.message.reply_text(answer)
 
 
@@ -149,7 +149,7 @@ def getPersonalAPIkey(user_id):
 
 
 def pw(update, context):
-    answer = 'Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pw bssid/essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
+    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     if len(tmp) == 2:
@@ -171,12 +171,12 @@ def pw(update, context):
             if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else:
-        answer = 'Поиск по bssid и essid выполняется так: /pw bssid essid (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
+        answer = 'Поиск по BSSID и ESSID выполняется так: /pw BSSID ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
 def pws(update, context):
-    answer = 'Забыли ввести bssid или essid! Поиск по bssid и/или essid выполняется так: /pws bssid/essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
+    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     if len(tmp) == 2:
@@ -198,12 +198,12 @@ def pws(update, context):
             if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else:
-        answer = 'Поиск по bssid и essid выполняется так: /pws bssid essid (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
+        answer = 'Поиск по BSSID и ESSID выполняется так: /pws BSSID ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
 def wps(update, context):
-    answer = 'Поиск wps пин кодов выполняется так: /wps bssid (пример: /wps FF:FF:FF:FF:FF:FF)'
+    answer = 'Поиск WPS пин-кодов выполняется так: /wps BSSID (пример: /wps FF:FF:FF:FF:FF:FF)'
     tmp = update.message.text.split()
     if len(tmp) == 2:
         if re.match(bssid_pattern, tmp[1]) is not None:
@@ -226,7 +226,7 @@ Score: {score}%
             else:
                 answer = 'Нет результатов :('
     if len(answer) > 3900:
-        update.message.reply_text(answer[:3900] + '\nСписок слишком большой, смотри дальше на 3wifi.stascorp.com', parse_mode='Markdown')
+        update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на https://3wifi.stascorp.com/wpspin', parse_mode='Markdown')
     else:
         update.message.reply_text(answer, parse_mode='Markdown')
 
