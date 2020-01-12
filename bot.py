@@ -55,7 +55,8 @@ def help(update, context):
 /pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
 /pws — то же самое, что /pw, но с учётом регистра (ESSID)
 /wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)
-/authorize login:password — авторизоваться с личным аккаунтом 3WiFi для снятия временных ограничений на поиск''')
+/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
+/logout — выполнить выход из личного аккаунта 3WiFi''')
 
 
 def printap(value):
@@ -84,7 +85,7 @@ def CheckAPresponse(data):
         if data['error'] == 'cooldown':
             return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
         elif data['error'] == 'loginfail':
-            return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /authorize, попробуйте сделать это снова или выйдите с помощью /logout'
+            return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /login, попробуйте сделать это снова или выйдите с помощью /logout'
         else:
             return 'Что-то пошло не так 😮 error: ' + data['error']
     if len(data['data']) == 0:
@@ -92,8 +93,8 @@ def CheckAPresponse(data):
     return ''
 
 
-def authorize(update, context):
-    answer = 'Авторизация выполняется так: /authorize login:password'
+def login(update, context):
+    answer = 'Авторизация выполняется так: /login username:password'
     tmp = update.message.text.split()
     if len(tmp) == 2:
         arg = tmp[1]
@@ -136,7 +137,7 @@ def logout(update, context):
     except KeyError:
         answer = 'Ошибка: невозможно выйти из аккаунта 3WiFi, т.к. вы не вошли'
     else:
-        answer = 'API-ключ вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /authorize'
+        answer = 'API-ключ вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /login'
     update.message.reply_text(answer)
 
 
@@ -241,7 +242,7 @@ bot = Bot(token=TOKEN)
 dp = updater.dispatcher
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
-dp.add_handler(CommandHandler("authorize", authorize))
+dp.add_handler(CommandHandler("login", login))
 dp.add_handler(CommandHandler("logout", logout))
 dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
