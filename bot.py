@@ -53,7 +53,7 @@ def unknown(update, context):
 def help(update, context):
     update.message.reply_text(f'''3wifi.stascorp.com бот!
 /pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
-/pws — /pw, но с учётом регистра (ESSID)
+/pws — то же самое, что /pw, но с учётом регистра (ESSID)
 /wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)
 /authorize login:password — авторизоваться с личным аккаунтом 3WiFi для снятия временных ограничений на поиск''')
 
