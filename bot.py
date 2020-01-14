@@ -51,12 +51,15 @@ def unknown(update, context):
 
 
 def help(update, context):
-    update.message.reply_text(f'''3wifi.stascorp.com бот!
+    answer = '''3wifi.stascorp.com бот!
 /pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
 /pws — то же самое, что /pw, но с учётом регистра (ESSID)
-/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)
-/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
-/logout — выполнить выход из личного аккаунта 3WiFi''')
+/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''
+    private_commands = '''\n/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
+/logout — выполнить выход из личного аккаунта 3WiFi'''
+    if update.message.chat.type == 'private':
+        answer += private_commands
+    update.message.reply_text(answer)
 
 
 def printap(value):
@@ -94,6 +97,9 @@ def CheckAPresponse(data):
 
 
 def login(update, context):
+    if update.message.chat.type != 'private':
+        update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
+        return
     answer = 'Авторизация выполняется так: /login username:password'
     tmp = update.message.text.split()
     if len(tmp) == 2:
@@ -133,6 +139,9 @@ def login(update, context):
 
 
 def logout(update, context):
+    if update.message.chat.type != 'private':
+        update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
+        return
     user_id = str(update.message.from_user.id)
     try:
         USER_KEYS.pop(user_id)
