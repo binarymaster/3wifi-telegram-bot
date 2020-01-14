@@ -251,7 +251,7 @@ dp.add_handler(CommandHandler("logout", logout))
 dp.add_handler(CommandHandler("wps", wps))
 dp.add_handler(CommandHandler("pw", pw))
 dp.add_handler(CommandHandler("pws", pws))
-dp.add_handler(MessageHandler(Filters.text | Filters.command, unknown))
+dp.add_handler(MessageHandler((Filters.text | Filters.command) & Filters.private, unknown))
 dp.add_error_handler(error)
 if IP == 'no':
     updater.start_polling(poll_interval=.5)
