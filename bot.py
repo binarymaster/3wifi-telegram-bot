@@ -227,11 +227,13 @@ def wps(update, context):
     answer = 'Поиск WPS пин-кодов выполняется так: /wps BSSID (пример: /wps FF:FF:FF:FF:FF:FF)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
+    user_id = str(update.message.from_user.id)
     if len(tmp) == 2:
+        answer = ''
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_KEY, tmp[1])).json()
-            if len(results['data']) > 0:
-                answer = ''
+            answer = CheckAPresponse(user_id, results)
+            if answer == '':
                 for result in results['data'][tmp[1].upper()]['scores']:
                     result['score'] *= 100
                     if result['score'] < 1:
@@ -245,8 +247,6 @@ Pin: `{result['value']}`
 Score: {score}%
 - - - - -
 """
-            else:
-                answer = 'Нет результатов :('
     if len(answer) > 3900:
         update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на https://3wifi.stascorp.com/wpspin', parse_mode='Markdown')
     else:
