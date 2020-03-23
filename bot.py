@@ -83,12 +83,17 @@ def printaps(values):
     return answer
 
 
-def CheckAPresponse(data):
+def CheckAPresponse(user_id, data):
     if data['result'] == 0:
         if data['error'] == 'cooldown':
             return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
         elif data['error'] == 'loginfail':
             return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /login, попробуйте сделать это снова или выйдите с помощью /logout'
+        elif data['error'] == 'lowlevel':
+            if user_id in USER_KEYS:
+                return 'Недостаточно прав для выполнения команды. Возможно ваш аккаунт 3WiFi заблокирован'
+            else:
+                return 'Недостаточно прав для выполнения команды. Вероятно, гостевой аккаунт заблокирован. Купить код приглашения можно тут: https://t.me/routerscan/15931'
         else:
             return 'Что-то пошло не так 😮 error: ' + data['error']
     if len(data['data']) == 0:
@@ -150,7 +155,7 @@ def logout(update, context):
     except KeyError:
         answer = 'Ошибка: невозможно выйти из аккаунта 3WiFi, т.к. вы не вошли'
     else:
-        answer = 'API-ключ вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /login'
+        answer = 'Выход выполнен, API-ключ вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /login'
     update.message.reply_text(answer)
 
 
@@ -166,22 +171,23 @@ def pw(update, context):
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
+    user_id = str(update.message.from_user.id)
     if len(tmp) == 2:
         answer = ''
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
-            answer = CheckAPresponse(results)
+            answer = CheckAPresponse(user_id, results)
             if answer == '':
                 answer = printaps(results['data'][f'{tmp[1]}'.upper()])
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}').json()
-            answer = CheckAPresponse(results)
+            answer = CheckAPresponse(user_id, results)
             if answer == '' and len(results['data']) == 1:
                 answer = printaps(results['data'][f'*|{tmp[1]}'])
     elif len(tmp) == 3:
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}').json()
-            answer = CheckAPresponse(results)
+            answer = CheckAPresponse(user_id, results)
             if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else:
@@ -193,22 +199,23 @@ def pws(update, context):
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
+    user_id = str(update.message.from_user.id)
     if len(tmp) == 2:
         answer = ''
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}').json()
-            answer = CheckAPresponse(results)
+            answer = CheckAPresponse(user_id, results)
             if answer == '':
                 answer = printaps(results['data'][f'{tmp[1]}'.upper()])
         else:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={tmp[1]}&sens=true').json()
-            answer = CheckAPresponse(results)
+            answer = CheckAPresponse(user_id, results)
             if answer == '':
                 answer = printaps(results['data'][f'*|{tmp[1]}'])
     elif len(tmp) == 3:
         if re.match(bssid_pattern, tmp[1]) is not None:
             results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={tmp[1]}&essid={tmp[2]}&sens=true').json()
-            answer = CheckAPresponse(results)
+            answer = CheckAPresponse(user_id, results)
             if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{tmp[1].upper()}|{tmp[2]}'][0])
     else:
