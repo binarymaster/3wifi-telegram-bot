@@ -137,3 +137,7 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Bot configuration files
+config.json
+userkeys.json
