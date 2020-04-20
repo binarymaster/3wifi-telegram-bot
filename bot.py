@@ -62,15 +62,26 @@ def help(update, context):
     update.message.reply_text(answer)
 
 
-def printap(value):
-    answer = f"""ESSID: `{value['essid']}`
-BSSID: `{value['bssid']}`
-Password: `{value['key']}`
-WPS PIN: `{value['wps']}`
-Time: {value['time']}
-"""
-    if 'lat' in value:
-        answer += f"[Точка на карте](http://3wifi.stascorp.com/map?lat={value['lat']}&lon={value['lon']})\n"
+def printap(data):
+    key_labels = {
+        'essid': 'ESSID',
+        'bssid': 'BSSID',
+        'key': 'Password',
+        'wps': 'WPS PIN',
+        'time': 'Date'
+    }
+    order = ['essid', 'bssid', 'key', 'wps', 'time']    # Order of values in the answer
+    copyable = ['essid', 'bssid', 'key', 'wps']   # Values that can be copied (monospaced font)
+    answer = ''
+    for element in order:
+        if (element in data) and data[element]:   # Check if value is not empty
+            key, value = element, data[element]
+            if (key in copyable) and (value != '<empty>'):
+                answer += f'{key_labels[key]}: `{value}`\n'
+            else:
+                answer += f'{key_labels[key]}: {value}\n'
+    if 'lat' in data:
+        answer += f"[Точка на карте](http://3wifi.stascorp.com/map?lat={data['lat']}&lon={data['lon']})\n"
     else:
         answer += '- - - - -\n'
     return answer
