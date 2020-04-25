@@ -239,21 +239,20 @@ def wps(update, context):
     API_KEY = getPersonalAPIkey(update.message.from_user.id)
     tmp = update.message.text.split()
     user_id = str(update.message.from_user.id)
-    if len(tmp) == 2:
+    if (len(tmp) == 2) and (re.match(bssid_pattern, tmp[1]) is not None):
         answer = ''
-        if re.match(bssid_pattern, tmp[1]) is not None:
-            results = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_KEY, tmp[1])).json()
-            answer = CheckAPresponse(user_id, results)
-            if answer == '':
-                for result in results['data'][tmp[1].upper()]['scores']:
-                    result['score'] *= 100
-                    if result['score'] < 1:
-                        score = "{0:.2f}".format(result['score'])
-                    elif result['score'] < 10:
-                        score = "{0:.1f}".format(result['score'])
-                    else:
-                        score = str(round(result['score']))
-                    answer += f"""Name: `{result['name']}`
+        results = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_KEY, tmp[1])).json()
+        answer = CheckAPresponse(user_id, results)
+        if answer == '':
+            for result in results['data'][tmp[1].upper()]['scores']:
+                result['score'] *= 100
+                if result['score'] < 1:
+                    score = "{0:.2f}".format(result['score'])
+                elif result['score'] < 10:
+                    score = "{0:.1f}".format(result['score'])
+                else:
+                    score = str(round(result['score']))
+                answer += f"""Name: `{result['name']}`
 Pin: `{result['value']}`
 Score: {score}%
 - - - - -
