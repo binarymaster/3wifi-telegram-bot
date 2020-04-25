@@ -5,7 +5,6 @@ import re
 import logging
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from telegram import Bot
 
 USER_KEYS_DB_FILENAME = 'userkeys.json'
 
@@ -140,7 +139,7 @@ def login(update, context):
                         # Send security notification to users with the same token
                         for telegram_id, api_key in USER_KEYS.items():
                             if (apikey == api_key) and (telegram_id != user_id) and (api_key != API_KEY):
-                                bot.send_message(
+                                context.bot.send_message(
                                     chat_id=telegram_id,
                                     text='*Уведомление безопасности*\n[Пользователь](tg://user?id={}) только что авторизовался в боте с вашим аккаунтом 3WiFi.'.format(user_id),
                                     parse_mode='Markdown'
@@ -268,7 +267,6 @@ def error(update, context):
 
 
 updater = Updater(TOKEN, use_context=True)
-bot = Bot(token=TOKEN)
 dp = updater.dispatcher
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
