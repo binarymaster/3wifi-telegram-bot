@@ -63,6 +63,19 @@ def help(update, context):
     update.message.reply_text(answer)
 
 
+def scoreformat(score):
+    answer = ''
+    score *= 100
+    if score < 1:
+        answer = "{0:.2f}".format(score)
+    elif score < 10:
+        answer = "{0:.1f}".format(score)
+    else:
+        answer = str(round(score))
+    answer += '%'
+    return answer
+
+
 def printap(data):
     key_labels = {
         'essid': 'ESSID',
@@ -88,10 +101,39 @@ def printap(data):
     return answer
 
 
+def printpin(data):
+    key_labels = {
+        'name': 'Name',
+        'value': 'Pin',
+        'score': 'Score'
+    }
+    order = ['name', 'value', 'score']    # Order of values in the answer
+    copyable = ['value']   # Values that can be copied (monospaced font)
+    answer = ''
+    for element in order:
+        if (element in data) and data[element]:   # Check if value is not empty
+            key, value = element, data[element]
+            if key == 'score':
+                value = scoreformat(value)
+            if key in copyable:
+                answer += f'{key_labels[key]}: `{value}`\n'
+            else:
+                answer += f'{key_labels[key]}: {value}\n'
+    answer += '- - - - -\n'
+    return answer
+
+
 def printaps(values):
     answer = ''
     for value in values:
         answer += printap(value)
+    return answer
+
+
+def printpins(values):
+    answer = ''
+    for value in values:
+        answer += printpin(value)
     return answer
 
 
@@ -254,19 +296,7 @@ def wps(update, context):
         results = requests.get('{}/api/apiwps?key={}&bssid={}'.format(SERVICE_URL, API_KEY, args[0])).json()
         answer = CheckAPresponse(user_id, results)
         if answer == '':
-            for result in results['data'][args[0].upper()]['scores']:
-                result['score'] *= 100
-                if result['score'] < 1:
-                    score = "{0:.2f}".format(result['score'])
-                elif result['score'] < 10:
-                    score = "{0:.1f}".format(result['score'])
-                else:
-                    score = str(round(result['score']))
-                answer += f"""Name: `{result['name']}`
-Pin: `{result['value']}`
-Score: {score}%
-- - - - -
-"""
+            answer = printpins(results['data'][args[0].upper()]['scores'])
     if len(answer) > 3900:
         update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на {}/wpspin'.format(SERVICE_URL), parse_mode='Markdown')
     else:
