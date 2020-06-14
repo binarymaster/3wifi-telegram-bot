@@ -6,6 +6,8 @@ import logging
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
+SERVICE_DOMAIN = '3wifi.stascorp.com'
+SERVICE_URL = 'https://' + SERVICE_DOMAIN
 USER_KEYS_DB_FILENAME = 'userkeys.json'
 
 # Initializing settings
@@ -50,10 +52,10 @@ def unknown(update, context):
 
 
 def help(update, context):
-    answer = '''3wifi.stascorp.com бот!
+    answer = '''{} бот!
 /pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
 /pws — то же самое, что /pw, но с учётом регистра (ESSID)
-/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''
+/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''.format(SERVICE_DOMAIN)
     private_commands = '''\n/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
 /logout — выполнить выход из личного аккаунта 3WiFi'''
     if update.message.chat.type == 'private':
@@ -80,7 +82,7 @@ def printap(data):
             else:
                 answer += f'{key_labels[key]}: {value}\n'
     if 'lat' in data:
-        answer += f"[Точка на карте](http://3wifi.stascorp.com/map?lat={data['lat']}&lon={data['lon']})\n"
+        answer += f"[Точка на карте]({SERVICE_URL}/map?lat={data['lat']}&lon={data['lon']})\n"
     else:
         answer += '- - - - -\n'
     return answer
@@ -122,7 +124,7 @@ def login(update, context):
         tmp = arg.split(':')
         if len(tmp) == 2:
             login, password = tmp
-            r = requests.post('https://3wifi.stascorp.com/api/apikeys', data={'login': login, 'password': password}).json()
+            r = requests.post(f'{SERVICE_URL}/api/apikeys', data={'login': login, 'password': password}).json()
             if r['result']:
                 if r['profile']['level'] > 0:
                     user_id = str(update.message.from_user.id)
@@ -187,18 +189,18 @@ def pw(update, context):
         if len(args) == 1:
             answer = ''
             if re.match(bssid_pattern, args[0]) is not None:
-                results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={args[0]}').json()
+                results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}').json()
                 answer = CheckAPresponse(user_id, results)
                 if answer == '':
                     answer = printaps(results['data'][f'{args[0]}'.upper()])
             else:
-                results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={args[0]}').json()
+                results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid=*&essid={args[0]}').json()
                 answer = CheckAPresponse(user_id, results)
                 if (answer == '') and (len(results['data']) == 1):
                     answer = printaps(results['data'][f'*|{args[0]}'])
         elif len(args) == 2:
             if re.match(bssid_pattern, args[0]) is not None:
-                results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={args[0]}&essid={args[1]}').json()
+                results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}&essid={args[1]}').json()
                 answer = CheckAPresponse(user_id, results)
                 if (answer == '') and (len(results['data']) == 1):
                     answer = printap(results['data'][f'{args[0].upper()}|{args[1]}'][0])
@@ -207,7 +209,7 @@ def pw(update, context):
     # Handler for BSSID message
     elif context.matches:
         bssid = update.message.text
-        results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={bssid}').json()
+        results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={bssid}').json()
         answer = CheckAPresponse(user_id, results)
         if answer == '':
             answer = printaps(results['data'][bssid.upper()])
@@ -222,18 +224,18 @@ def pws(update, context):
     if len(args) == 1:
         answer = ''
         if re.match(bssid_pattern, args[0]) is not None:
-            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={args[0]}').json()
+            results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}').json()
             answer = CheckAPresponse(user_id, results)
             if answer == '':
                 answer = printaps(results['data'][f'{args[0]}'.upper()])
         else:
-            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid=*&essid={args[0]}&sens=true').json()
+            results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid=*&essid={args[0]}&sens=true').json()
             answer = CheckAPresponse(user_id, results)
             if answer == '':
                 answer = printaps(results['data'][f'*|{args[0]}'])
     elif len(args) == 2:
         if re.match(bssid_pattern, args[0]) is not None:
-            results = requests.get(f'https://3wifi.stascorp.com/api/apiquery?key={API_KEY}&bssid={args[0]}&essid={args[1]}&sens=true').json()
+            results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}&essid={args[1]}&sens=true').json()
             answer = CheckAPresponse(user_id, results)
             if answer == '' and len(results['data']) == 1:
                 answer = printap(results['data'][f'{args[0].upper()}|{args[1]}'][0])
@@ -249,7 +251,7 @@ def wps(update, context):
     args = context.args
     if (len(args) == 1) and (re.match(bssid_pattern, args[0]) is not None):
         answer = ''
-        results = requests.get('https://3wifi.stascorp.com/api/apiwps?key={}&bssid={}'.format(API_KEY, args[0])).json()
+        results = requests.get('{}/api/apiwps?key={}&bssid={}'.format(SERVICE_URL, API_KEY, args[0])).json()
         answer = CheckAPresponse(user_id, results)
         if answer == '':
             for result in results['data'][args[0].upper()]['scores']:
@@ -266,7 +268,7 @@ Score: {score}%
 - - - - -
 """
     if len(answer) > 3900:
-        update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на https://3wifi.stascorp.com/wpspin', parse_mode='Markdown')
+        update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на {}/wpspin'.format(SERVICE_URL), parse_mode='Markdown')
     else:
         update.message.reply_text(answer, parse_mode='Markdown')
 
