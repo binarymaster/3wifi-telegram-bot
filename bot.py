@@ -4,7 +4,8 @@ import json
 import re
 import logging
 import requests
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
+                          ConversationHandler)
 
 SERVICE_DOMAIN = '3wifi.stascorp.com'
 SERVICE_URL = 'https://' + SERVICE_DOMAIN
@@ -45,6 +46,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class ConversationStates():
+    LOGIN_PROMPT = 1
+    PASSWORD_PROMPT = 2
 
 
 def unknown(update, context):
@@ -194,14 +200,37 @@ def login(update, context):
     """Handler for /login command"""
     if update.message.chat.type != 'private':
         update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
-        return
-    answer = 'Авторизация выполняется так: /login username:password'
+        return ConversationHandler.END
+    answer = 'Укажите логин'
     if context.args:
         args = ' '.join(context.args)
         if ':' in args:
             login, password = args.split(':')[:2]
             answer = authorize(login, password, context, update.message.from_user.id)
+            update.message.reply_text(answer, parse_mode='Markdown')
+            return ConversationHandler.END
     update.message.reply_text(answer, parse_mode='Markdown')
+    return ConversationStates.LOGIN_PROMPT
+
+
+def login_prompt(update, context):
+    context.user_data['login'] = update.message.text
+    update.message.reply_text('Укажите пароль')
+    return ConversationStates.PASSWORD_PROMPT
+
+
+def password_prompt(update, context):
+    password = update.message.text
+    login = context.user_data['login']
+    answer = authorize(login, password, context, update.message.from_user.id)
+    update.message.reply_text(answer, parse_mode='Markdown')
+    return ConversationHandler.END
+
+
+def cancel_conversation(update, context):
+    '''Generic conversation canceler'''
+    update.message.reply_text('Операция отменена.')
+    return ConversationHandler.END
 
 
 def logout(update, context):
@@ -320,9 +349,18 @@ def error(update, context):
 
 updater = Updater(TOKEN, use_context=True)
 dp = updater.dispatcher
+
+auth_conversation = ConversationHandler(
+    entry_points=[CommandHandler("login", login, pass_args=True)],
+    states={
+        ConversationStates.LOGIN_PROMPT: [MessageHandler(Filters.text & ~Filters.command, login_prompt)],
+        ConversationStates.PASSWORD_PROMPT: [MessageHandler(Filters.text & ~Filters.command, password_prompt)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel_conversation)]
+)
+dp.add_handler(auth_conversation)
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
-dp.add_handler(CommandHandler("login", login, pass_args=True))
 dp.add_handler(CommandHandler("logout", logout))
 dp.add_handler(CommandHandler("wps", wps, pass_args=True))
 dp.add_handler(CommandHandler("pw", pw, pass_args=True))
@@ -330,6 +368,7 @@ dp.add_handler(CommandHandler("pws", pws, pass_args=True))
 dp.add_handler(MessageHandler(Filters.regex(bssid_pattern) & Filters.private, pw))
 dp.add_handler(MessageHandler((Filters.text | Filters.command) & Filters.private, unknown))
 dp.add_error_handler(error)
+
 if IP == 'no':
     updater.start_polling(poll_interval=.5)
 else:
