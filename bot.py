@@ -155,49 +155,57 @@ def CheckAPresponse(user_id, data):
     return ''
 
 
+def authorize(login, password, context, user_id):
+    """3WiFi authorization interface"""
+    r = requests.post(f'{SERVICE_URL}/api/apikeys', data={'login': login, 'password': password}).json()
+    if r['result']:
+        if r['profile']['level'] > 0:
+            user_id = str(user_id)
+            nickname = r['profile']['nick']
+            try:
+                apikey = list(filter(lambda x: x['access'] == 'read', r['data']))[0]['key']
+            except IndexError:
+                answer = 'Ошибка: аккаунт *{}* не имеет API-ключа на чтение. Получите его на сайте, затем повторите попытку авторизации.'.format(nickname)
+            else:
+                USER_KEYS[user_id] = apikey
+                with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
+                    json.dump(USER_KEYS, outf, indent=4)
+                answer = 'Вы успешно авторизованы как *{}*. Чтобы выйти, отправьте /logout'.format(nickname)
+                # Send security notification to users with the same token
+                for telegram_id, api_key in USER_KEYS.items():
+                    if (apikey == api_key) and (telegram_id != user_id) and (api_key != API_KEY):
+                        context.bot.send_message(
+                            chat_id=telegram_id,
+                            text='*Уведомление безопасности*\n[Пользователь](tg://user?id={}) только что авторизовался в боте с вашим аккаунтом 3WiFi.'.format(user_id),
+                            parse_mode='Markdown'
+                            )
+        else:
+            answer = 'Ошибка: уровень доступа аккаунта ниже уровня *пользователь*'
+    elif r['error'] == 'loginfail':
+        answer = 'Ошибка — проверьте логин и пароль'
+    elif r['error'] == 'lowlevel':
+        answer = 'Ошибка: ваш аккаунт заблокирован'
+    else:
+        answer = 'Что-то пошло не так 😮 error: {}'.format(r['error'])
+    return answer
+
+
 def login(update, context):
+    """Handler for /login command"""
     if update.message.chat.type != 'private':
         update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
         return
     answer = 'Авторизация выполняется так: /login username:password'
-    tmp = update.message.text.split()
-    if len(tmp) == 2:
-        arg = tmp[1]
-        tmp = arg.split(':')
-        if len(tmp) == 2:
-            login, password = tmp
-            r = requests.post(f'{SERVICE_URL}/api/apikeys', data={'login': login, 'password': password}).json()
-            if r['result']:
-                if r['profile']['level'] > 0:
-                    user_id = str(update.message.from_user.id)
-                    nickname = r['profile']['nick']
-                    try:
-                        apikey = list(filter(lambda x: x['access'] == 'read', r['data']))[0]['key']
-                    except IndexError:
-                        answer = 'Ошибка — аккаунт *{}* не имеет API ключа на чтение. Получите его на сайте, затем повторите попытку авторизации.'.format(nickname)
-                    else:
-                        USER_KEYS[user_id] = apikey
-                        with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
-                            json.dump(USER_KEYS, outf, indent=4)
-                        answer = 'Вы успешно авторизованы как *{}*. Чтобы выйти, отправьте /logout'.format(nickname)
-                        # Send security notification to users with the same token
-                        for telegram_id, api_key in USER_KEYS.items():
-                            if (apikey == api_key) and (telegram_id != user_id) and (api_key != API_KEY):
-                                context.bot.send_message(
-                                    chat_id=telegram_id,
-                                    text='*Уведомление безопасности*\n[Пользователь](tg://user?id={}) только что авторизовался в боте с вашим аккаунтом 3WiFi.'.format(user_id),
-                                    parse_mode='Markdown'
-                                    )
-                else:
-                    answer = 'Ошибка: уровень доступа аккаунта ниже уровня *пользователь*'
-            elif r['error'] == 'loginfail':
-                answer = 'Ошибка — проверьте логин и пароль'
-            else:
-                answer = 'Что-то пошло не так 😮 error: {}'.format(r['error'])
+    if context.args:
+        args = ' '.join(context.args)
+        if ':' in args:
+            login, password = args.split(':')[:2]
+            answer = authorize(login, password, context, update.message.from_user.id)
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
 def logout(update, context):
+    """Handler for /logout command"""
     if update.message.chat.type != 'private':
         update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
         return
@@ -222,6 +230,7 @@ def getPersonalAPIkey(user_id):
 
 
 def pw(update, context):
+    """Handler for /pw command"""
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     user_id = str(update.message.from_user.id)
     API_KEY = getPersonalAPIkey(user_id)
@@ -259,6 +268,7 @@ def pw(update, context):
 
 
 def pws(update, context):
+    """Handler for /pws command"""
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
     user_id = str(update.message.from_user.id)
     API_KEY = getPersonalAPIkey(user_id)
@@ -287,6 +297,7 @@ def pws(update, context):
 
 
 def wps(update, context):
+    """Handler for /wps command"""
     answer = 'Поиск WPS пин-кодов выполняется так: /wps BSSID (пример: /wps FF:FF:FF:FF:FF:FF)'
     user_id = str(update.message.from_user.id)
     API_KEY = getPersonalAPIkey(user_id)
