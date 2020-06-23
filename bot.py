@@ -4,6 +4,7 @@ import json
 import re
 import logging
 import requests
+from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler)
 
@@ -40,7 +41,10 @@ except FileNotFoundError:
     with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
         json.dump(USER_KEYS, outf, indent=4)
 
-bssid_pattern = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
+# Single BSSID pattern
+bssid_pattern = re.compile(r"^(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})$")
+# BSSID multi-line list pattern. Maximum 100 BSSID
+bssid_list_pattern = re.compile(r"(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})(?:[\n](?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})){0,99}")
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -51,6 +55,8 @@ logger = logging.getLogger(__name__)
 class ConversationStates():
     LOGIN_PROMPT = 1
     PASSWORD_PROMPT = 2
+    BSSID_PROMPT = 3
+    ESSID_PROMPT = 4
 
 
 def scoreformat(score):
@@ -151,7 +157,7 @@ def getApiErrorDesc(error, user_id):
 
 
 def apiquery(user_id, bssid='*', essid=None, sensivity=False):
-    """Implements querying AP by its BSSID/ESSID"""
+    """Implements querying single AP by its BSSID/ESSID"""
     api_key = getPersonalAPIkey(user_id)
     url = f'{SERVICE_URL}/api/apiquery?key={api_key}&bssid={bssid}'
     if essid is not None:
@@ -168,7 +174,7 @@ def apiquery(user_id, bssid='*', essid=None, sensivity=False):
 
 
 def apiwps(user_id, bssid):
-    """Implements generating PIN codes by AP BSSID"""
+    """Implements generating PIN codes for single AP by its BSSID"""
     api_key = getPersonalAPIkey(user_id)
     response = requests.get(f'{SERVICE_URL}/api/apiwps?key={api_key}&bssid={bssid}').json()
     if not response['result']:
@@ -180,16 +186,16 @@ def apiwps(user_id, bssid):
 
 def parseApDataArgs(args):
     """Parsing BSSID and ESSID from /pw command arguments"""
-    if re.match(bssid_pattern, args[0]) is not None: 
-        bssid = args[0] 
-        if len(args) > 1: 
-            essid = ' '.join(args[1:]) 
-        else: 
-            essid = None 
-    else: 
-         bssid = '*' 
-         essid = ' '.join(args) 
-    return bssid, essid 
+    if re.match(bssid_pattern, args[0]) is not None:
+        bssid = args[0]
+        if len(args) > 1:
+            essid = ' '.join(args[1:])
+        else:
+            essid = None
+    else:
+        bssid = '*'
+        essid = ' '.join(args)
+    return bssid, essid
 
 
 def unknown(update, context):
@@ -250,7 +256,7 @@ def login(update, context):
     if update.message.chat.type != 'private':
         update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
         return ConversationHandler.END
-    answer = 'Укажите логин'
+    answer = 'Укажите логин:'
     if context.args:
         args = ' '.join(context.args)
         if ':' in args:
@@ -258,13 +264,13 @@ def login(update, context):
             answer = authorize(login, password, context, update.message.from_user.id)
             update.message.reply_text(answer, parse_mode='Markdown')
             return ConversationHandler.END
-    update.message.reply_text(answer, parse_mode='Markdown')
+    update.message.reply_text(answer)
     return ConversationStates.LOGIN_PROMPT
 
 
 def login_prompt(update, context):
     context.user_data['login'] = update.message.text
-    update.message.reply_text('Укажите пароль')
+    update.message.reply_text('Укажите пароль:')
     return ConversationStates.PASSWORD_PROMPT
 
 
@@ -302,34 +308,81 @@ def logout(update, context):
 def pw(update, context):
     """Handler for /pw command"""
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
-    user_id = str(update.message.from_user.id)
+    user_id = update.message.from_user.id
     args = context.args
-    # Handler for /pw command
-    if (args is not None) and (len(args) > 0):
+    if len(args) > 0:
         bssid, essid = parseApDataArgs(args)
         answer = apiquery(user_id, bssid, essid)
-    # Handler for BSSID message
-    elif context.matches:
-        bssid = update.message.text
-        answer = apiquery(user_id, bssid=bssid)
+    elif update.message.chat.type == 'private':
+        reply_keyboard = [['↪ Пропустить']]
+        update.message.reply_text(
+            'Укажите BSSID:',
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard,
+                                             one_time_keyboard=True,
+                                             resize_keyboard=True)
+        )
+        context.user_data['sensivity'] = False
+        return ConversationStates.BSSID_PROMPT
     update.message.reply_text(answer, parse_mode='Markdown')
+    return ConversationHandler.END
+
+
+def bssid_prompt(update, context):
+    t = update.message.text
+    if re.match(bssid_pattern, t) is not None:
+        reply_keyboard = [['↪ Пропустить']]
+        context.user_data['bssid'] = t
+        update.message.reply_text(
+            'Укажите ESSID:',
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard,
+                                             one_time_keyboard=True,
+                                             resize_keyboard=True)
+        )
+        return ConversationStates.ESSID_PROMPT
+    elif re.match(r'↪ ', t) is not None:
+        # Skip the BSSID prompt
+        context.user_data['bssid'] = '*'
+        update.message.reply_text('Укажите ESSID:', reply_markup=ReplyKeyboardRemove())
+        return ConversationStates.ESSID_PROMPT
+    else:
+        update.message.reply_text('Ошибка: неверный формат BSSID. Укажите BSSID:')
+        return ConversationStates.BSSID_PROMPT
+
+
+def essid_prompt(update, context):
+    t = update.message.text
+    if re.match(r'↪ ', t) is not None:
+        # Skip the ESSID prompt
+        essid = None
+    else:
+        essid = t
+    bssid = context.user_data['bssid']
+    sensivity = context.user_data['sensivity']
+    answer = apiquery(update.message.from_user.id, bssid, essid, sensivity)
+    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
 
 
 def pws(update, context):
     """Handler for /pws command"""
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
-    user_id = str(update.message.from_user.id)
+    user_id = update.message.from_user.id
     args = context.args
     if len(args) > 0:
         bssid, essid = parseApDataArgs(args)
         answer = apiquery(user_id, bssid, essid, sensivity=True)
+    elif update.message.chat.type == 'private':
+        update.message.reply_text('Укажите BSSID:')
+        context.user_data['sensivity'] = True
+        return ConversationStates.BSSID_PROMPT
     update.message.reply_text(answer, parse_mode='Markdown')
+    return ConversationHandler.END
 
 
 def wps(update, context):
     """Handler for /wps command"""
     answer = 'Поиск WPS пин-кодов выполняется так: /wps BSSID (пример: /wps FF:FF:FF:FF:FF:FF)'
-    user_id = str(update.message.from_user.id)
+    user_id = update.message.from_user.id
     args = context.args
     if (len(args) == 1) and (re.match(bssid_pattern, args[0]) is not None):
         answer = apiwps(user_id, args[0])
@@ -337,6 +390,40 @@ def wps(update, context):
         update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на {}/wpspin'.format(SERVICE_URL), parse_mode='Markdown')
     else:
         update.message.reply_text(answer, parse_mode='Markdown')
+
+
+def querybssidlist(update, context):
+    """Handler for message containing BSSID"""
+    user_id = update.message.from_user.id
+    bssid_list = update.message.text.splitlines()
+    # Filtering BSSID list with preversing order
+    seen = set()
+    bssid_list = [x for x in bssid_list if not (x in seen or seen.add(x))]
+    del seen
+    if len(bssid_list) == 1:
+        # Fetch 10 records for single BSSID
+        answer = apiquery(user_id, bssid=bssid_list[0])
+    else:
+        # Fetch one record per BSSID
+        response = requests.post(
+            f'{SERVICE_URL}/api/apiquery',
+            json={
+                'key': getPersonalAPIkey(user_id),
+                'bssid': bssid_list
+            }
+        ).json()
+        if not response['result']:
+            answer = getApiErrorDesc(response['error'], user_id)
+        elif len(response['data']) == 0:
+            answer = 'Нет результатов :('
+        else:
+            data = response['data']
+            print(data)
+            answer = ''
+            for bssid in bssid_list:
+                if bssid in data:
+                    answer += formatap(data[bssid][0])
+    update.message.reply_text(answer, parse_mode='Markdown')
 
 
 def error(update, context):
@@ -354,14 +441,22 @@ auth_conversation = ConversationHandler(
     },
     fallbacks=[CommandHandler("cancel", cancel_conversation)]
 )
+ap_query_conversation = ConversationHandler(
+    entry_points=[CommandHandler("pw", pw, pass_args=True), CommandHandler("pws", pws, pass_args=True)],
+    states={
+        ConversationStates.BSSID_PROMPT: [MessageHandler(Filters.text & ~Filters.command, bssid_prompt)],
+        ConversationStates.ESSID_PROMPT: [MessageHandler(Filters.text & ~Filters.command, essid_prompt)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel_conversation)],
+    conversation_timeout=600   # 10 minutes
+)
 dp.add_handler(auth_conversation)
+dp.add_handler(ap_query_conversation)
 dp.add_handler(CommandHandler("help", help))
 dp.add_handler(CommandHandler("start", help))
 dp.add_handler(CommandHandler("logout", logout))
 dp.add_handler(CommandHandler("wps", wps, pass_args=True))
-dp.add_handler(CommandHandler("pw", pw, pass_args=True))
-dp.add_handler(CommandHandler("pws", pws, pass_args=True))
-dp.add_handler(MessageHandler(Filters.regex(bssid_pattern) & Filters.private, pw))
+dp.add_handler(MessageHandler(Filters.regex(bssid_list_pattern) & Filters.private, querybssidlist))
 dp.add_handler(MessageHandler((Filters.text | Filters.command) & Filters.private, unknown))
 dp.add_error_handler(error)
 
