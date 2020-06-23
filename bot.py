@@ -53,22 +53,6 @@ class ConversationStates():
     PASSWORD_PROMPT = 2
 
 
-def unknown(update, context):
-    update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
-
-
-def help(update, context):
-    answer = '''{} бот!
-/pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
-/pws — то же самое, что /pw, но с учётом регистра (ESSID)
-/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''.format(SERVICE_DOMAIN)
-    private_commands = '''\n/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
-/logout — выполнить выход из личного аккаунта 3WiFi'''
-    if update.message.chat.type == 'private':
-        answer += private_commands
-    update.message.reply_text(answer)
-
-
 def scoreformat(score):
     answer = ''
     score *= 100
@@ -82,7 +66,16 @@ def scoreformat(score):
     return answer
 
 
-def printap(data):
+def getPersonalAPIkey(user_id):
+    """Gets 3WiFi API key by Telegram user ID"""
+    user_id = str(user_id)
+    if user_id in USER_KEYS:
+        return USER_KEYS[user_id]
+    else:
+        return API_KEY
+
+
+def formatap(data):
     key_labels = {
         'essid': 'ESSID',
         'bssid': 'BSSID',
@@ -107,7 +100,7 @@ def printap(data):
     return answer
 
 
-def printpin(data):
+def formatpin(data):
     key_labels = {
         'name': 'Name',
         'value': 'Pin',
@@ -129,36 +122,78 @@ def printpin(data):
     return answer
 
 
-def printaps(values):
+def formataps(values):
     answer = ''
     for value in values:
-        answer += printap(value)
+        answer += formatap(value)
     return answer
 
 
-def printpins(values):
+def formatpins(values):
     answer = ''
     for value in values:
-        answer += printpin(value)
+        answer += formatpin(value)
     return answer
 
 
-def CheckAPresponse(user_id, data):
-    if data['result'] == 0:
-        if data['error'] == 'cooldown':
-            return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
-        elif data['error'] == 'loginfail':
-            return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /login, попробуйте сделать это снова или выйдите с помощью /logout'
-        elif data['error'] == 'lowlevel':
-            if user_id in USER_KEYS:
-                return 'Недостаточно прав для выполнения команды. Возможно, ваш аккаунт 3WiFi заблокирован'
-            else:
-                return 'Недостаточно прав для выполнения команды. Вероятно, гостевой аккаунт заблокирован. Купить код приглашения можно тут: https://t.me/routerscan/15931'
+def getApiErrorDesc(error, user_id):
+    if error == 'cooldown':
+        return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
+    elif error == 'loginfail':
+        return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /login, попробуйте сделать это снова или выйдите с помощью /logout'
+    elif error == 'lowlevel':
+        if str(user_id) in USER_KEYS:
+            return 'Недостаточно прав для выполнения команды. Возможно, ваш аккаунт 3WiFi заблокирован'
         else:
-            return 'Что-то пошло не так 😮 error: ' + data['error']
-    if len(data['data']) == 0:
+            return 'Недостаточно прав для выполнения команды. Вероятно, гостевой аккаунт заблокирован. Купить код приглашения можно тут: https://t.me/routerscan/15931'
+    else:
+        return 'Что-то пошло не так 😮 error: ' + error
+
+
+def apiquery(user_id, bssid='*', essid=None, sensivity=False):
+    """Implements querying AP by its BSSID/ESSID"""
+    api_key = getPersonalAPIkey(user_id)
+    url = f'{SERVICE_URL}/api/apiquery?key={api_key}&bssid={bssid}'
+    if essid is not None:
+        url += f'&essid={essid}'
+    if sensivity:
+        url += '&sens=true'
+    response = requests.get(url).json()
+
+    if not response['result']:
+        return getApiErrorDesc(response['error'], user_id)
+    if len(response['data']) == 0:
         return 'Нет результатов :('
-    return ''
+    return formataps(tuple(response['data'].values())[0])
+
+
+def apiwps(user_id, bssid):
+    """Implements generating PIN codes by AP BSSID"""
+    api_key = getPersonalAPIkey(user_id)
+    response = requests.get(f'{SERVICE_URL}/api/apiwps?key={api_key}&bssid={bssid}').json()
+    if not response['result']:
+        return getApiErrorDesc(response['error'], user_id)
+    if len(response['data']) == 0:
+        return 'Нет результатов :('
+    return formatpins(response['data'][bssid.upper()]['scores'])
+
+
+def unknown(update, context):
+    """Handler for unknown commands"""
+    update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
+
+
+def help(update, context):
+    """Hadler for /help command"""
+    answer = '''{} бот!
+/pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
+/pws — то же самое, что /pw, но с учётом регистра (ESSID)
+/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''.format(SERVICE_DOMAIN)
+    private_commands = '''\n/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
+/logout — выполнить выход из личного аккаунта 3WiFi'''
+    if update.message.chat.type == 'private':
+        answer += private_commands
+    update.message.reply_text(answer)
 
 
 def authorize(login, password, context, user_id):
@@ -250,49 +285,27 @@ def logout(update, context):
     update.message.reply_text(answer)
 
 
-def getPersonalAPIkey(user_id):
-    user_id = str(user_id)
-    if user_id in USER_KEYS:
-        return USER_KEYS[user_id]
-    else:
-        return API_KEY
-
-
 def pw(update, context):
     """Handler for /pw command"""
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     user_id = str(update.message.from_user.id)
-    API_KEY = getPersonalAPIkey(user_id)
     args = context.args
     # Handler for /pw command
     if args is not None:
         if len(args) == 1:
             answer = ''
             if re.match(bssid_pattern, args[0]) is not None:
-                results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}').json()
-                answer = CheckAPresponse(user_id, results)
-                if answer == '':
-                    answer = printaps(results['data'][f'{args[0]}'.upper()])
+                answer = apiquery(user_id, bssid=args[0])
             else:
-                results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid=*&essid={args[0]}').json()
-                answer = CheckAPresponse(user_id, results)
-                if (answer == '') and (len(results['data']) == 1):
-                    answer = printaps(results['data'][f'*|{args[0]}'])
-        elif len(args) == 2:
-            if re.match(bssid_pattern, args[0]) is not None:
-                results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}&essid={args[1]}').json()
-                answer = CheckAPresponse(user_id, results)
-                if (answer == '') and (len(results['data']) == 1):
-                    answer = printap(results['data'][f'{args[0].upper()}|{args[1]}'][0])
+                answer = apiquery(user_id, essid=args[0])
+        elif (len(args) == 2) and (re.match(bssid_pattern, args[0]) is not None):
+            answer = apiquery(user_id, bssid=args[0], essid=args[1])
         else:
             answer = 'Поиск по BSSID и ESSID выполняется так: /pw BSSID ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
     # Handler for BSSID message
     elif context.matches:
         bssid = update.message.text
-        results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={bssid}').json()
-        answer = CheckAPresponse(user_id, results)
-        if answer == '':
-            answer = printaps(results['data'][bssid.upper()])
+        answer = apiquery(user_id, bssid=bssid)
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
@@ -300,26 +313,15 @@ def pws(update, context):
     """Handler for /pws command"""
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
     user_id = str(update.message.from_user.id)
-    API_KEY = getPersonalAPIkey(user_id)
     args = context.args
     if len(args) == 1:
         answer = ''
         if re.match(bssid_pattern, args[0]) is not None:
-            results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}').json()
-            answer = CheckAPresponse(user_id, results)
-            if answer == '':
-                answer = printaps(results['data'][f'{args[0]}'.upper()])
+            answer = apiquery(user_id, bssid=args[0], sensivity=True)
         else:
-            results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid=*&essid={args[0]}&sens=true').json()
-            answer = CheckAPresponse(user_id, results)
-            if answer == '':
-                answer = printaps(results['data'][f'*|{args[0]}'])
-    elif len(args) == 2:
-        if re.match(bssid_pattern, args[0]) is not None:
-            results = requests.get(f'{SERVICE_URL}/api/apiquery?key={API_KEY}&bssid={args[0]}&essid={args[1]}&sens=true').json()
-            answer = CheckAPresponse(user_id, results)
-            if answer == '' and len(results['data']) == 1:
-                answer = printap(results['data'][f'{args[0].upper()}|{args[1]}'][0])
+            answer = apiquery(user_id, essid=args[0], sensivity=True)
+    elif (len(args) == 2) and (re.match(bssid_pattern, args[0]) is not None):
+        answer = apiquery(user_id, bssid=args[0], essid=args[1], sensivity=True)
     else:
         answer = 'Поиск по BSSID и ESSID выполняется так: /pws BSSID ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
     update.message.reply_text(answer, parse_mode='Markdown')
@@ -329,14 +331,9 @@ def wps(update, context):
     """Handler for /wps command"""
     answer = 'Поиск WPS пин-кодов выполняется так: /wps BSSID (пример: /wps FF:FF:FF:FF:FF:FF)'
     user_id = str(update.message.from_user.id)
-    API_KEY = getPersonalAPIkey(user_id)
     args = context.args
     if (len(args) == 1) and (re.match(bssid_pattern, args[0]) is not None):
-        answer = ''
-        results = requests.get('{}/api/apiwps?key={}&bssid={}'.format(SERVICE_URL, API_KEY, args[0])).json()
-        answer = CheckAPresponse(user_id, results)
-        if answer == '':
-            answer = printpins(results['data'][args[0].upper()]['scores'])
+        answer = apiwps(user_id, args[0])
     if len(answer) > 3900:
         update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на {}/wpspin'.format(SERVICE_URL), parse_mode='Markdown')
     else:
