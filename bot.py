@@ -178,6 +178,20 @@ def apiwps(user_id, bssid):
     return formatpins(response['data'][bssid.upper()]['scores'])
 
 
+def parseApDataArgs(args):
+    """Parsing BSSID and ESSID from /pw command arguments"""
+    if re.match(bssid_pattern, args[0]) is not None: 
+        bssid = args[0] 
+        if len(args) > 1: 
+            essid = ' '.join(args[1:]) 
+        else: 
+            essid = None 
+    else: 
+         bssid = '*' 
+         essid = ' '.join(args) 
+    return bssid, essid 
+
+
 def unknown(update, context):
     """Handler for unknown commands"""
     update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
@@ -291,17 +305,9 @@ def pw(update, context):
     user_id = str(update.message.from_user.id)
     args = context.args
     # Handler for /pw command
-    if args is not None:
-        if len(args) == 1:
-            answer = ''
-            if re.match(bssid_pattern, args[0]) is not None:
-                answer = apiquery(user_id, bssid=args[0])
-            else:
-                answer = apiquery(user_id, essid=args[0])
-        elif (len(args) == 2) and (re.match(bssid_pattern, args[0]) is not None):
-            answer = apiquery(user_id, bssid=args[0], essid=args[1])
-        else:
-            answer = 'Поиск по BSSID и ESSID выполняется так: /pw BSSID ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL)'
+    if (args is not None) and (len(args) > 0):
+        bssid, essid = parseApDataArgs(args)
+        answer = apiquery(user_id, bssid, essid)
     # Handler for BSSID message
     elif context.matches:
         bssid = update.message.text
@@ -314,16 +320,9 @@ def pws(update, context):
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
     user_id = str(update.message.from_user.id)
     args = context.args
-    if len(args) == 1:
-        answer = ''
-        if re.match(bssid_pattern, args[0]) is not None:
-            answer = apiquery(user_id, bssid=args[0], sensivity=True)
-        else:
-            answer = apiquery(user_id, essid=args[0], sensivity=True)
-    elif (len(args) == 2) and (re.match(bssid_pattern, args[0]) is not None):
-        answer = apiquery(user_id, bssid=args[0], essid=args[1], sensivity=True)
-    else:
-        answer = 'Поиск по BSSID и ESSID выполняется так: /pws BSSID ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL)'
+    if len(args) > 0:
+        bssid, essid = parseApDataArgs(args)
+        answer = apiquery(user_id, bssid, essid, sensivity=True)
     update.message.reply_text(answer, parse_mode='Markdown')
 
 
