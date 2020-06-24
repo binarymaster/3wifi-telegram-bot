@@ -4,9 +4,10 @@ import json
 import re
 import logging
 import requests
-from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
+from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove,
+                      InlineKeyboardButton, InlineKeyboardMarkup)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler)
+                          ConversationHandler, CallbackQueryHandler)
 
 SERVICE_DOMAIN = '3wifi.stascorp.com'
 SERVICE_URL = 'https://' + SERVICE_DOMAIN
@@ -166,11 +167,15 @@ def apiquery(user_id, bssid='*', essid=None, sensivity=False):
         url += '&sens=true'
     response = requests.get(url).json()
 
+    reply_markup = None
     if not response['result']:
-        return getApiErrorDesc(response['error'], user_id)
+        return getApiErrorDesc(response['error'], user_id), reply_markup
     if len(response['data']) == 0:
-        return 'Нет результатов :('
-    return formataps(tuple(response['data'].values())[0])
+        if bssid != '*':
+            keyboard = [[InlineKeyboardButton('Сгенерировать пин-коды WPS', callback_data=f'{user_id}/{bssid}')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+        return 'Нет результатов :(', reply_markup
+    return formataps(tuple(response['data'].values())[0]), reply_markup
 
 
 def apiwps(user_id, bssid):
@@ -284,7 +289,7 @@ def password_prompt(update, context):
 
 def cancel_conversation(update, context):
     '''Generic conversation canceler'''
-    update.message.reply_text('Операция отменена.')
+    update.message.reply_text('Операция отменена.', reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
@@ -310,9 +315,10 @@ def pw(update, context):
     answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
     user_id = update.message.from_user.id
     args = context.args
+    reply_markup = None
     if len(args) > 0:
         bssid, essid = parseApDataArgs(args)
-        answer = apiquery(user_id, bssid, essid)
+        answer, reply_markup = apiquery(user_id, bssid, essid)
     elif update.message.chat.type == 'private':
         reply_keyboard = [['↪ Пропустить']]
         update.message.reply_text(
@@ -323,7 +329,7 @@ def pw(update, context):
         )
         context.user_data['sensivity'] = False
         return ConversationStates.BSSID_PROMPT
-    update.message.reply_text(answer, parse_mode='Markdown')
+    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -358,7 +364,7 @@ def essid_prompt(update, context):
         essid = t
     bssid = context.user_data['bssid']
     sensivity = context.user_data['sensivity']
-    answer = apiquery(update.message.from_user.id, bssid, essid, sensivity)
+    answer, reply_markup = apiquery(update.message.from_user.id, bssid, essid, sensivity)
     update.message.reply_text(answer, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
@@ -370,12 +376,12 @@ def pws(update, context):
     args = context.args
     if len(args) > 0:
         bssid, essid = parseApDataArgs(args)
-        answer = apiquery(user_id, bssid, essid, sensivity=True)
+        answer, reply_markup = apiquery(user_id, bssid, essid, sensivity=True)
     elif update.message.chat.type == 'private':
         update.message.reply_text('Укажите BSSID:')
         context.user_data['sensivity'] = True
         return ConversationStates.BSSID_PROMPT
-    update.message.reply_text(answer, parse_mode='Markdown')
+    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -400,9 +406,11 @@ def querybssidlist(update, context):
     seen = set()
     bssid_list = [x for x in bssid_list if not (x in seen or seen.add(x))]
     del seen
+
+    reply_markup = None
     if len(bssid_list) == 1:
         # Fetch 10 records for single BSSID
-        answer = apiquery(user_id, bssid=bssid_list[0])
+        answer, reply_markup = apiquery(user_id, bssid=bssid_list[0])
     else:
         # Fetch one record per BSSID
         response = requests.post(
@@ -423,7 +431,25 @@ def querybssidlist(update, context):
             for bssid in bssid_list:
                 if bssid in data:
                     answer += formatap(data[bssid][0])
-    update.message.reply_text(answer, parse_mode='Markdown')
+    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=reply_markup)
+
+
+def callbackbutton(update, context):
+    """Handler for WPS PIN inline button"""
+    query = update.callback_query
+    initiator_id, bssid = query.data.split('/')
+    user_id = str(query.from_user.id)
+    if initiator_id != user_id:
+        query.answer(text='Эта кнопка предназначена для инициатора запроса')
+    else:
+        query.answer()
+        old_text = query.message.text
+        query.edit_message_text(
+            text=f'{old_text}\n\n*Пин-коды WPS:*\n_Ожидайте…_', parse_mode='Markdown'
+        )
+        answer = apiwps(initiator_id, bssid)
+        text = f'{old_text}\n\n*Пин-коды WPS:*\n{answer}'
+        query.edit_message_text(text=text, parse_mode='Markdown')
 
 
 def error(update, context):
@@ -458,6 +484,7 @@ dp.add_handler(CommandHandler("logout", logout))
 dp.add_handler(CommandHandler("wps", wps, pass_args=True))
 dp.add_handler(MessageHandler(Filters.regex(bssid_list_pattern) & Filters.private, querybssidlist))
 dp.add_handler(MessageHandler((Filters.text | Filters.command) & Filters.private, unknown))
+dp.add_handler(CallbackQueryHandler(callbackbutton))
 dp.add_error_handler(error)
 
 if IP == 'no':
