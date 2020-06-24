@@ -172,7 +172,12 @@ def apiquery(user_id, bssid='*', essid=None, sensivity=False):
         return getApiErrorDesc(response['error'], user_id), reply_markup
     if len(response['data']) == 0:
         if bssid != '*':
-            keyboard = [[InlineKeyboardButton('Сгенерировать пин-коды WPS', callback_data=f'{user_id}/{bssid}')]]
+            keyboard = [
+                [
+                    InlineKeyboardButton('Сгенерировать пин-коды WPS',
+                                         callback_data=f'{user_id}/{bssid}')
+                ]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
         return 'Нет результатов :(', reply_markup
     return formataps(tuple(response['data'].values())[0]), reply_markup
@@ -181,7 +186,9 @@ def apiquery(user_id, bssid='*', essid=None, sensivity=False):
 def apiwps(user_id, bssid):
     """Implements generating PIN codes for single AP by its BSSID"""
     api_key = getPersonalAPIkey(user_id)
-    response = requests.get(f'{SERVICE_URL}/api/apiwps?key={api_key}&bssid={bssid}').json()
+    response = requests.get(
+        f'{SERVICE_URL}/api/apiwps?key={api_key}&bssid={bssid}'
+    ).json()
     if not response['result']:
         return getApiErrorDesc(response['error'], user_id)
     if len(response['data']) == 0:
@@ -205,7 +212,9 @@ def parseApDataArgs(args):
 
 def unknown(update, context):
     """Handler for unknown commands"""
-    update.message.reply_text('Команда не найдена! Отправьте /help для получения информации по доступным командам')
+    update.message.reply_text(
+        'Команда не найдена! Отправьте /help для получения информации по доступным командам'
+        )
 
 
 def help(update, context):
@@ -223,7 +232,10 @@ def help(update, context):
 
 def authorize(login, password, context, user_id):
     """3WiFi authorization interface"""
-    r = requests.post(f'{SERVICE_URL}/api/apikeys', data={'login': login, 'password': password}).json()
+    r = requests.post(
+        f'{SERVICE_URL}/api/apikeys',
+        data={'login': login, 'password': password}
+    ).json()
     if r['result']:
         if r['profile']['level'] > 0:
             user_id = str(user_id)
@@ -259,14 +271,18 @@ def authorize(login, password, context, user_id):
 def login(update, context):
     """Handler for /login command"""
     if update.message.chat.type != 'private':
-        update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
+        update.message.reply_text(
+            'Команда работает только в личных сообщениях (ЛС)'
+        )
         return ConversationHandler.END
     answer = 'Укажите логин:'
     if context.args:
         args = ' '.join(context.args)
         if ':' in args:
             login, password = args.split(':')[:2]
-            answer = authorize(login, password, context, update.message.from_user.id)
+            answer = authorize(
+                login, password, context, update.message.from_user.id
+            )
             update.message.reply_text(answer, parse_mode='Markdown')
             return ConversationHandler.END
     update.message.reply_text(answer)
@@ -289,14 +305,19 @@ def password_prompt(update, context):
 
 def cancel_conversation(update, context):
     '''Generic conversation canceler'''
-    update.message.reply_text('Операция отменена.', reply_markup=ReplyKeyboardRemove())
+    update.message.reply_text(
+        'Операция отменена.',
+        reply_markup=ReplyKeyboardRemove()
+    )
     return ConversationHandler.END
 
 
 def logout(update, context):
     """Handler for /logout command"""
     if update.message.chat.type != 'private':
-        update.message.reply_text('Команда работает только в личных сообщениях (ЛС)')
+        update.message.reply_text(
+            'Команда работает только в личных сообщениях (ЛС)'
+        )
         return
     user_id = str(update.message.from_user.id)
     try:
@@ -329,7 +350,8 @@ def pw(update, context):
         )
         context.user_data['sensivity'] = False
         return ConversationStates.BSSID_PROMPT
-    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=reply_markup)
+    update.message.reply_text(
+        answer, parse_mode='Markdown', reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -348,10 +370,12 @@ def bssid_prompt(update, context):
     elif re.match(r'↪ ', t) is not None:
         # Skip the BSSID prompt
         context.user_data['bssid'] = '*'
-        update.message.reply_text('Укажите ESSID:', reply_markup=ReplyKeyboardRemove())
+        update.message.reply_text(
+            'Укажите ESSID:', reply_markup=ReplyKeyboardRemove())
         return ConversationStates.ESSID_PROMPT
     else:
-        update.message.reply_text('Ошибка: неверный формат BSSID. Укажите BSSID:')
+        update.message.reply_text(
+            'Ошибка: неверный формат BSSID. Укажите BSSID:')
         return ConversationStates.BSSID_PROMPT
 
 
@@ -364,8 +388,11 @@ def essid_prompt(update, context):
         essid = t
     bssid = context.user_data['bssid']
     sensivity = context.user_data['sensivity']
-    answer, reply_markup = apiquery(update.message.from_user.id, bssid, essid, sensivity)
-    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+    answer, reply_markup = apiquery(
+        update.message.from_user.id, bssid, essid, sensivity
+    )
+    update.message.reply_text(
+        answer, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
@@ -381,7 +408,8 @@ def pws(update, context):
         update.message.reply_text('Укажите BSSID:')
         context.user_data['sensivity'] = True
         return ConversationStates.BSSID_PROMPT
-    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=reply_markup)
+    update.message.reply_text(
+        answer, parse_mode='Markdown', reply_markup=reply_markup)
     return ConversationHandler.END
 
 
@@ -393,7 +421,10 @@ def wps(update, context):
     if (len(args) == 1) and (re.match(bssid_pattern, args[0]) is not None):
         answer = apiwps(user_id, args[0])
     if len(answer) > 3900:
-        update.message.reply_text(answer[:3900] + '\nСписок слишком большой — смотрите полностью на {}/wpspin'.format(SERVICE_URL), parse_mode='Markdown')
+        update.message.reply_text(
+            f'{answer[:3900]}\nСписок слишком большой — смотрите полностью на {SERVICE_URL}/wpspin',
+            parse_mode='Markdown'
+        )
     else:
         update.message.reply_text(answer, parse_mode='Markdown')
 
@@ -431,7 +462,8 @@ def querybssidlist(update, context):
             for bssid in bssid_list:
                 if bssid in data:
                     answer += formatap(data[bssid][0])
-    update.message.reply_text(answer, parse_mode='Markdown', reply_markup=reply_markup)
+    update.message.reply_text(
+        answer, parse_mode='Markdown', reply_markup=reply_markup)
 
 
 def callbackbutton(update, context):
@@ -445,11 +477,14 @@ def callbackbutton(update, context):
         query.answer()
         old_text = query.message.text
         query.edit_message_text(
-            text=f'{old_text}\n\n*Пин-коды WPS:*\n_Ожидайте…_', parse_mode='Markdown'
+            text=f'{old_text}\n\n*Пин-коды WPS:*\n_Ожидайте…_',
+            parse_mode='Markdown'
         )
         answer = apiwps(initiator_id, bssid)
-        text = f'{old_text}\n\n*Пин-коды WPS:*\n{answer}'
-        query.edit_message_text(text=text, parse_mode='Markdown')
+        query.edit_message_text(
+            text=f'{old_text}\n\n*Пин-коды WPS:*\n{answer}',
+            parse_mode='Markdown'
+        )
 
 
 def error(update, context):
@@ -462,16 +497,27 @@ dp = updater.dispatcher
 auth_conversation = ConversationHandler(
     entry_points=[CommandHandler("login", login, pass_args=True)],
     states={
-        ConversationStates.LOGIN_PROMPT: [MessageHandler(Filters.text & ~Filters.command, login_prompt)],
-        ConversationStates.PASSWORD_PROMPT: [MessageHandler(Filters.text & ~Filters.command, password_prompt)]
+        ConversationStates.LOGIN_PROMPT: [
+            MessageHandler(Filters.text & ~Filters.command, login_prompt)
+        ],
+        ConversationStates.PASSWORD_PROMPT: [
+            MessageHandler(Filters.text & ~Filters.command, password_prompt)
+        ]
     },
     fallbacks=[CommandHandler("cancel", cancel_conversation)]
 )
 ap_query_conversation = ConversationHandler(
-    entry_points=[CommandHandler("pw", pw, pass_args=True), CommandHandler("pws", pws, pass_args=True)],
+    entry_points=[
+        CommandHandler("pw", pw, pass_args=True),
+        CommandHandler("pws", pws, pass_args=True)
+    ],
     states={
-        ConversationStates.BSSID_PROMPT: [MessageHandler(Filters.text & ~Filters.command, bssid_prompt)],
-        ConversationStates.ESSID_PROMPT: [MessageHandler(Filters.text & ~Filters.command, essid_prompt)]
+        ConversationStates.BSSID_PROMPT: [
+            MessageHandler(Filters.text & ~Filters.command, bssid_prompt)
+        ],
+        ConversationStates.ESSID_PROMPT: [
+            MessageHandler(Filters.text & ~Filters.command, essid_prompt)
+        ]
     },
     fallbacks=[CommandHandler("cancel", cancel_conversation)],
     conversation_timeout=600   # 10 minutes
@@ -490,4 +536,11 @@ dp.add_error_handler(error)
 if IP == 'no':
     updater.start_polling(poll_interval=.5)
 else:
-    updater.start_webhook(listen='0.0.0.0', port=8443, url_path=TOKEN, key='private.key', cert='cert.pem', webhook_url=f'https://{IP}:8443/{TOKEN}')
+    updater.start_webhook(
+        listen='0.0.0.0',
+        port=8443,
+        url_path=TOKEN,
+        key='private.key',
+        cert='cert.pem',
+        webhook_url=f'https://{IP}:8443/{TOKEN}'
+    )
