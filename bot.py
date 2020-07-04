@@ -435,7 +435,7 @@ def querybssidlist(update, context):
     bssid_list = update.message.text.splitlines()
     # Filtering BSSID list with preversing order
     seen = set()
-    bssid_list = [x for x in bssid_list if not (x in seen or seen.add(x))]
+    bssid_list = [x.upper() for x in bssid_list if not (x in seen or seen.add(x))]
     del seen
 
     reply_markup = None
@@ -457,7 +457,6 @@ def querybssidlist(update, context):
             answer = 'Нет результатов :('
         else:
             data = response['data']
-            print(data)
             answer = ''
             for bssid in bssid_list:
                 if bssid in data:
