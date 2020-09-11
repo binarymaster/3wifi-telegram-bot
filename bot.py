@@ -333,7 +333,7 @@ def logout(update, context):
 
 def pw(update, context):
     """Handler for /pw command"""
-    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: /pw FF:FF:FF:FF:FF:FF VILTEL или /pw FF:FF:FF:FF:FF:FF или /pw netgear)'
+    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: `/pw FF:FF:FF:FF:FF:FF VILTEL` или `/pw FF:FF:FF:FF:FF:FF` или `/pw netgear`)'
     user_id = update.message.from_user.id
     args = context.args
     reply_markup = None
@@ -398,7 +398,7 @@ def essid_prompt(update, context):
 
 def pws(update, context):
     """Handler for /pws command"""
-    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: /pws FF:FF:FF:FF:FF:FF VILTEL или /pws FF:FF:FF:FF:FF:FF или /pws netgear)'
+    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: `/pws FF:FF:FF:FF:FF:FF VILTEL` или `/pws FF:FF:FF:FF:FF:FF` или `/pws netgear`)'
     user_id = update.message.from_user.id
     args = context.args
     if len(args) > 0:
