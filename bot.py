@@ -223,7 +223,7 @@ def help(update, context):
 /pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
 /pws — то же самое, что /pw, но с учётом регистра (ESSID)
 /wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''.format(SERVICE_DOMAIN)
-    private_commands = '''\n/login username:password — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
+    private_commands = '''\n/login — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
 /logout — выполнить выход из личного аккаунта 3WiFi'''
     if update.message.chat.type == 'private':
         answer += private_commands
