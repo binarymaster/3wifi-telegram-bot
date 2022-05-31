@@ -1,5 +1,5 @@
-# 3Wi-Fi Bot
-![logo](https://3wifi.stascorp.com/img/logo.png "3Wi-Fi")
+# 3WiFi Bot
+![logo](https://3wifi.stascorp.com/img/logo.png "3WiFi")
 
 ### Основные преимущества
 
