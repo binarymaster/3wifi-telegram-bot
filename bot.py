@@ -504,7 +504,7 @@ async def search_mess(message: types.Message):
                                         built += f'{lng.getmess(message, f"s_{every}") }:  `{datetime.strptime(prebuilt[every], "%Y-%m-%d %H:%M:%S").date()}`\n'
                                     elif every == 'lat':
                                         built += f'{lng.getmess(message, f"s_maps")}: '
-                                        built += f'[3WiFi](https://3wifi.stascorp.com/map?lat={prebuilt["lat"]}&lon={prebuilt["lon"]}), '
+                                        built += f'[3WiFi]({SERVICE_URL}/map?lat={prebuilt["lat"]}&lon={prebuilt["lon"]}), '
                                         built += f'[Google](https://www.google.com/maps/search/?api=1&query={prebuilt["lat"]},{prebuilt["lon"]})\n'
                                     elif every == 'lon': pass
                                     else: built += f'{lng.getmess(message, f"s_{every}")}:  `{prebuilt[every]}`\n'
