@@ -486,7 +486,7 @@ async def search_mess(message: types.Message):
                         'bssid': [m for m in macs] if macs != [] else '*',
                         'sens': True if com == '/sr' else False
                         }
-                    r = requests.post('https://3wifi.stascorp.com/api/apiquery', json = p).json()
+                    r = requests.post(f'{SERVICE_URL}/api/apiquery', json = p).json()
                     if r['result'] == True and r['data'] != []:
                         order = ['essid', 'bssid', 'key', 'wps', 'time', 'lat', 'lon']
                         prebuilt = {}
