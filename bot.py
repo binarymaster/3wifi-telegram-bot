@@ -291,7 +291,7 @@ async def start_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
         await help_mess(message)
     elif users.getstatus(message) == Status.UNAUTH:
-        await message.reply(lng.getmess(message, "start"), parse_mode = "Markdown")
+        await message.reply(lng.getmess(message, "start").format(url = SERVICE_URL), parse_mode = "Markdown")
 
 @dp.message(commands = ['help'])
 async def help_mess(message: types.Message):
