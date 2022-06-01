@@ -594,11 +594,11 @@ async def who_mess(message: types.Message):
                 mac = [m.upper().replace('-', ':') for m in re.findall(MAC, query)][0]
             finally:
                 s = requests.Session()
-                s.post('https://3wifi.stascorp.com/user.php?a=login', 
+                s.post(f'{SERVICE_URL}/user.php?a=login', 
                     data = {'login': users.data[str(message.from_user.id)]['login'], 
                         'password': users.data[str(message.from_user.id)]['pass']})
-                get = s.post('https://3wifi.stascorp.com/3wifi.php?a=devicemac', data = {'bssid': mac}).json()
-                s.get(f'https://3wifi.stascorp.com/user.php?a=logout6{s.get("https://3wifi.stascorp.com/user.php?a=token").json()["token"]}')
+                get = s.post(f'{SERVICE_URL}/3wifi.php?a=devicemac', data = {'bssid': mac}).json()
+                s.get(f'{SERVICE_URL}/user.php?a=logout6{s.get(f"{SERVICE_URL}/user.php?a=token").json()["token"]}')
                 if get['result'] == True:
                     mess = f'`{mac}` {lng.getmess(message, "who")}:\n'
                     mess += SEPARATOR
