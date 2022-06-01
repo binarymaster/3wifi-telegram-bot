@@ -632,7 +632,7 @@ async def where_mess(message: types.Message):
                     lon = splitter[1].strip()
                     data = {'mac': mac, 'lat': lat, 'lon': lon}
                     built = f'{data["mac"]}\n`{data["lon"]}, {data["lat"]}`\n{lng.getmess(message, "s_maps")}: '
-                    built += f'[3WiFi](https://3wifi.stascorp.com/map?lat={data["lat"]}&lon={data["lon"]}), '
+                    built += f'[3WiFi]({SERVICE_URL}/map?lat={data["lat"]}&lon={data["lon"]}), '
                     built += f'[Google](https://www.google.com/maps/search/?api=1&query={data["lon"]},{data["lat"]})\n'
                     await message.reply(built, parse_mode = "Markdown", disable_web_page_preview = True)
                     await bot.send_location(message.chat.id, longitude = lon, latitude = lat, reply_to_message_id = message.message_id)
