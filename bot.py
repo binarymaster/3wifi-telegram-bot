@@ -535,7 +535,7 @@ async def wps_mess(message: types.Message, inline = None):
                 uid = str(message.from_user.id) if message else str(inline['message'].from_user.id)
                 p = {'key': users.data[uid]['key'] if users.getstatus(message if message else inline['message']) == Status.AUTH else ADMIN_KEY, 
                     'bssid': [m for m in macs]}
-                r = requests.post('https://3wifi.stascorp.com/api/apiwps', json = p).json()
+                r = requests.post(f'{SERVICE_URL}/api/apiwps', json = p).json()
                 if r['result'] == True and r['data'] != []:
                     built = ''
                     maxi = 10
