@@ -39,7 +39,7 @@
 	"s_time":"Загружено",
 	"s_wps":"WPS пин",
 	"security":"В ваш аккаунт вошел пользователь:\nИмя: `{name}`\nID: {uid}\nUsername: {username}",
-	"start":"Привет, это база [3Wi-Fi](https://3wifi.stascorp.com)\nЧтобы использовать, войдите: /login",
+	"start":"Привет, это база [3WiFi](https://3wifi.stascorp.com)\nЧтобы использовать, войдите: /login",
 	"user_del":"Временный пользователь удалён",
 	"users_id":"ID",
 	"users_code":"Временный код",
