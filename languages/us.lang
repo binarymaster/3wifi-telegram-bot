@@ -39,7 +39,7 @@
 	"s_time":"Uploaded",
 	"s_wps":"WPS pin",
 	"security":"Someone logged in to your account:\nName: `{name}`\nID: {uid}\nUsername: {username}",
-	"start":"Hello, its [3Wi-Fi](https://3wifi.stascorp.com) base\nTo use functions of this bot you need to /login",
+	"start":"Hello, its [3WiFi](https://3wifi.stascorp.com) base\nTo use functions of this bot you need to /login",
 	"user_del":"Temporary user removed",
 	"users_id":"ID",
 	"users_code":"Temporary code",
