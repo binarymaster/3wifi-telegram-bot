@@ -377,6 +377,11 @@ async def login_mess(message: types.Message):
         users.mod(mess = message, login = '///login///')
         await message.reply(lng.getmess(message, "login_wait"), parse_mode = "Markdown")
 
+@dp.message(commands = ['logout'])
+async def logout_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH and message.from_user.id == message.chat.id:
+        users.mod(mess = message, login = ' ', password = ' ',  key = ' ')
+        await message.reply(lng.getmess(message, "logout"), parse_mode = "Markdown")
 @dp.message(commands = ['lang'])
 async def lang_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH and message.from_user.id == message.chat.id:
