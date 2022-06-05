@@ -588,6 +588,7 @@ async def wpsg_mess(message: types.Message):
                     built += SEPARATOR
                 await message.reply(built, parse_mode = "HTML")
 
+"""
 @dp.message(commands = ['whatis'])
 async def who_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
@@ -617,6 +618,7 @@ async def who_mess(message: types.Message):
                     await message.reply(mess, parse_mode = "Markdown")
                 else:
                     await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
+"""
 
 @dp.message(commands = ['where'])
 async def where_mess(message: types.Message):
