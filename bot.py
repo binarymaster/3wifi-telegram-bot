@@ -588,10 +588,10 @@ async def wpsg_mess(message: types.Message):
                     built += SEPARATOR
                 await message.reply(built, parse_mode = "HTML")
 
-@dp.message(commands = ['who'])
+@dp.message(commands = ['whatis'])
 async def who_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
-        query = message.text.replace('/who ', '').replace(f'@{BOT_USERNAME}', '').strip()
+        query = message.text.replace('/whatis ', '').replace(f'@{BOT_USERNAME}', '').strip()
         if query == '':
             await message.reply(lang.get(ulang(uid), 'empty'), parse_mode = "Markdown")
         else:
