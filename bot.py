@@ -22,7 +22,7 @@ from aiogram.dispatcher.filters.callback_data import CallbackData
 
 # static #
 SERVICE_URL = 'https://3wifi.stascorp.com'
-USERKEYS_FILE = 'userkeys.json'
+USERS_FILE = 'users.json'
 CONFIG_FILE = 'config.json'
 LANG_DIR = 'languages'
 SEPARATOR = '================\n'
