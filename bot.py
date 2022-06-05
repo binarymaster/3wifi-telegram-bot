@@ -471,10 +471,10 @@ async def listcode_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
         await message.reply(cost_code_reactor(message.text.replace('/listcost', '').strip(), 'cost.data', full = True), parse_mode = "Markdown")
 
-@dp.message(commands = ['s', 'sr'])
+@dp.message(commands = ['pw', 'pws'])
 async def search_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
-        com = '/sr' if '/sr' in message.text else '/s'
+        com = '/pws' if '/pws' in message.text else '/pw'
         query = message.text.replace(com, '').replace(f'@{BOT_USERNAME}', '').strip()
         if query == '':
             await message.reply(lng.getmess(message, "empty"), parse_mode = "Markdown")
