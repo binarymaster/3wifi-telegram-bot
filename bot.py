@@ -489,7 +489,7 @@ async def search_mess(message: types.Message):
                     p = {'key': users.data[str(message.from_user.id)]['key'] if users.getstatus(message) == Status.AUTH else ADMIN_KEY, 
                         'essid': query if query != [] else '*', 
                         'bssid': [m for m in macs] if macs != [] else '*',
-                        'sens': True if com == '/sr' else False
+                        'sens': True if com == '/pws' else False
                         }
                     r = requests.post(f'{SERVICE_URL}/api/apiquery', json = p).json()
                     if r['result'] == True and r['data'] != []:
