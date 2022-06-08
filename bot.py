@@ -480,7 +480,7 @@ async def search_mess(message: types.Message):
             await message.reply(lng.getmess(message, "empty"), parse_mode = "Markdown")
         else:
             try:
-                macs = [m.upper().replace('-', ':') for m in re.findall(MAC, query)]
+                macs = [m for m in re.findall(MAC, query)]
                 for m in macs:
                     query = query.replace(m, '').strip()
             except:
