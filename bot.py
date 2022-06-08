@@ -1,4 +1,4 @@
-# imports #
+# Imports #
 import os
 import asyncio
 import json
@@ -13,14 +13,16 @@ from enum import IntEnum
 from datetime import datetime 
 import flag
 
-# aiogram #
+
+# Aiogram import #
 from aiogram import Bot
 from aiogram import Dispatcher
 from aiogram import types
 from aiogram import F
 from aiogram.dispatcher.filters.callback_data import CallbackData
 
-# static #
+
+# Kinda static #
 SERVICE_URL = 'https://3wifi.stascorp.com'
 USERS_FILE = 'users.json'
 CONFIG_FILE = 'config.json'
@@ -28,7 +30,8 @@ LANG_DIR = 'languages'
 SEPARATOR = '================\n'
 BOT_USERNAME = "wifi3_bot"
 
-# status #
+
+# Status class #
 class Status(IntEnum):
     UNAUTH = 0
     LOGIN = 1
@@ -36,8 +39,11 @@ class Status(IntEnum):
     AUTH = 3
     MAYDAY = 4
 
-# configuration #
+
+# Configuration class #
 class Config:
+    
+    
     def __init__(self, path):
         try:
             self.path = path
@@ -56,6 +62,8 @@ class Config:
             self.codes = []
             self.acodes = []
             self.update()
+
+
     def update(self):
         with open(self.path, 'w', encoding = 'utf-8') as c:
             json.dump({
@@ -65,6 +73,8 @@ class Config:
                 'codes': self.codes,
                 'acodes': self.acodes
                 }, c, indent = 4)
+
+
     def code(self, t):
         check = []
         for u in users.data:
@@ -80,44 +90,57 @@ class Config:
             else: self.codes.append(code)
             self.update()
             return code
+
+
     def remcode(self, code, t):
         if t == 'acodes': self.acodes.remove(code)
         else: self.codes.remove(code)
+
 cfg = Config(CONFIG_FILE)
 
-# users #
+
+# Users class #
 class Users:
+    
+
     def __init__(self, path):
         try:
             self.path = path
             with open(self.path, 'r', encoding = 'utf-8') as c:
                 self.data = json.load(c)
+
         except FileNotFoundError:
             with open(self.path, 'w', encoding = 'utf-8') as c:
                 self.data = {}
                 self.update()
+
+
     def update(self):
         with open(self.path, 'w', encoding = 'utf-8') as c:
             json.dump(self.data, c, indent = 4)
+
+
     def getstatus(self, mess):
         try:
-            if self.data[str(mess.from_user.id)]['key'] == ' ':
+            if self.data[str(mess.from_user.id)]['key'] == '-':
                 return Status.UNAUTH
-            elif self.data[str(mess.from_user.id)]['key'] == 'login':
+            elif self.data[str(mess.from_user.id)]['key'] == '+':
                 return Status.LOGIN
-            elif self.data[str(mess.from_user.id)]['key'] == 'pass':
+            elif self.data[str(mess.from_user.id)]['key'][0] == ' ':
                 return Status.PASS
             if self.data[str(mess.from_user.id)]['code'] != ' ':
                 return Status.MAYDAY
             else:
                 return Status.AUTH
+
         except:
             code = mess.from_user.language_code
-            self.mod(mess = mess, login = ' ',
-                password = ' ', key = ' ',
+            self.mod(mess = mess, key = '-',
                 code = ' ', acode = ' ',
                 language = 'ua' if code == 'ua' else 'ru' if code == 'ru' else 'us')
             return Status.UNAUTH
+
+
     def mod(self, mess = None, user_id = None, key = None, 
     code = None, acode = None, language = None):
         user_id = str(mess.from_user.id) if user_id == None else user_id
@@ -128,56 +151,76 @@ class Users:
         'language': language if language else self.data[user_id]['language']
         }
         self.update()
+
+
     def admin(self, mess):
         if self.data[str(mess.from_user.id)]['acode'] != ' ':
             return True
         elif self.data[str(mess.from_user.id)]['key'] == cfg.key:
             return True
-        else: 
-            return False
+        else: return False
+
+
     def super(self, mess):
         if self.data[str(mess.from_user.id)]['key'] == cfg.key:
             return True
-        else:
-            return False
+        else: return False
+            
+
     def lang(self, mess):
         return self.data[str(mess.from_user.id)]['language']
+
+
     def langbyuid(self, uid):
         return self.data[uid]['language']
+
+
     def admins(self, mess):
         admins = {}
         for d in self.data:
             if self.data[d]['acode'] != ' ':
                 admins[d] = self.data[d]
         return admins
+
+
     def maydayusers(self, mess):
         users = {}
         for d in self.data:
             if self.data[d]['code'] != ' ':
                 userss[d] = self.data[d]
         return users
+
+
     def freecodes(self):
         used = []
         for u in users.data:
             if users.data[u]['code'] in cfg.codes:
                 used.append(users.data[u]['code'])
         return list(set(cfg.codes) - set(used)) + list(set(used) - set(cfg.codes))
+
+
     def freeacodes(self):
         used = []
         for u in users.data:
             if users.data[u]['acode'] in cfg.acodes:
                 used.append(users.data[u]['acode'])
         return list(set(cfg.acodes) - set(used)) + list(set(used) - set(cfg.acodes))
+
+
     def security(self, login):
         unsec = []
         for u in users.data:
             if users.data[u]['login'] == login:
                 unsec.append(u)
         return unsec
+
 users = Users(USERS_FILE)
 
-# language #
+
+# Languages class #
 class Languages:
+    
+    
     def __init__(self, path):
         try:
             self.data = {}
@@ -186,15 +229,23 @@ class Languages:
                     self.data[f.replace('.lang', '')] = json.load(l)
         except Exception as ex:
             print(ex)
+
+
     def langs(self):
         return [l for l in self.data]
+
+
     def getmess(self, mess, what):
         return self.data[users.lang(mess)][what]
+
+
     def getmessbyuid(self, uid, what):
         return self.data[users.langbyuid(uid)][what]
+
 lng = Languages(LANG_DIR)
 
-# splitter #
+
+# Message splitter #
 def splitter(mess):
     if len(mess) > 4096:
         splitmess = mess.split(SEPARATOR)
@@ -213,7 +264,8 @@ def splitter(mess):
         mess = list().append(mess)
         return mess
 
-# data reactors #
+
+# Reactions [vuln, invites] #
 def vuln_reactor(text):
     with open('vuln.data', 'r', encoding = 'utf-8') as vuln:
         vulns = vuln.read().split('\n')
@@ -222,6 +274,8 @@ def vuln_reactor(text):
         if text.lower() in v.lower():
             built += f'`{v}`\n'
     return built if len(built) > 0 else None
+
+
 def cost_code_reactor(text, f, full = None):
     with open(f, 'r', encoding = 'utf-8') as t:
         templates = t.read().split('\n')
@@ -238,7 +292,8 @@ def cost_code_reactor(text, f, full = None):
     else:
         return False
 
-# data changer #
+
+# Editor #
 def changer(text, mode, f):
     with open(f, 'r', encoding = 'utf-8') as data:
         d = data.read().split('\n')
@@ -261,27 +316,37 @@ def changer(text, mode, f):
     except:
         return False
 
-# bot #
+
+# Bot initialization #
 bot = Bot(token = cfg.token)
 dp = Dispatcher()
 
-# callbacks #
+
+# Callbacks #
 class WpsCallback(CallbackData, prefix = 'wps'):
     wps: int
+
+
 class LangCallback(CallbackData, prefix = 'lang'):
     lang: str
+
+
 class MaydayCallback(CallbackData, prefix = "md"):
     turn: int
 
-# logger #
+
+# Logger setup #
 logform = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 logging.basicConfig(format = logform, level = logging.DEBUG)
 log = logging.getLogger(__name__)
 
-# filters #
-MAC = r'(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})'
 
-# bot body #
+# MAC filter #
+MAC = r'(?:[0-9A-Fa-f]{2}[:.-]){5}(?:[0-9A-Fa-f]{2})'
+
+# Bot body #
+
+# /start #
 @dp.message(commands = ['start'])
 async def start_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
@@ -289,6 +354,8 @@ async def start_mess(message: types.Message):
     elif users.getstatus(message) == Status.UNAUTH:
         await message.reply(lng.getmess(message, "start").format(url = SERVICE_URL), parse_mode = "Markdown")
 
+
+# /help #
 @dp.message(commands = ['help'])
 async def help_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
@@ -298,6 +365,8 @@ async def help_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "help"), parse_mode = "Markdown")
 
+
+# /users #
 @dp.message(commands = ['users'])
 async def users_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -329,16 +398,22 @@ async def users_mess(message: types.Message):
             for m in mess:
                 await message.reply(m, parse_mode = "Markdown")
 
+
+# /add #
 @dp.message(commands = ['add'])
 async def add_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
         await message.reply(f'{lng.getmess(message, "users_code")}: `{cfg.code("codes")}`', parse_mode = "Markdown")
 
+
+# /addadmin #
 @dp.message(commands = ['addadmin'])
 async def add_admin_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
         await message.reply(f'{lng.getmess(message, "admin_code")}: `{cfg.code("acodes")}`', parse_mode = "Markdown")
 
+
+# /del #
 @dp.message(text_startswith = '/del')
 async def del_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -348,6 +423,8 @@ async def del_mess(message: types.Message):
         cfg.remcode(message.text, "codes")
         await message.reply(lng.getmess(message, "user_del"))
 
+
+# /deladmin #
 @dp.message(text_startswith = '/deladmin')
 async def deladmin_mess(message: types.Message):
     if users.super(message) == True and message.from_user.id == message.chat.id:
@@ -356,6 +433,8 @@ async def deladmin_mess(message: types.Message):
         cfg.remcode(message.text, "acodes")
         await message.reply(lng.getmess(message, "adm_del"))
 
+
+# /mayday #
 @dp.message(commands = ['mayday'])
 async def mayday_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -367,17 +446,24 @@ async def mayday_mess(message: types.Message):
         elif cfg.mayday == '1':
             await message.reply(lng.getmess(message, "mayday_question_off"), parse_mode = "Markdown", reply_markup = kb)
 
+
+# /login #
 @dp.message(commands = ['login'])
 async def login_mess(message: types.Message):
     if users.getstatus(message) == Status.UNAUTH and message.from_user.id == message.chat.id:
-        users.mod(mess = message, login = '///login///')
+        users.mod(mess = message, key = '+')
         await message.reply(lng.getmess(message, "login_wait"), parse_mode = "Markdown")
 
+
+# /logout #
 @dp.message(commands = ['logout'])
 async def logout_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH and message.from_user.id == message.chat.id:
-        users.mod(mess = message, login = ' ', password = ' ',  key = ' ')
+        users.mod(mess = message, key = '-')
         await message.reply(lng.getmess(message, "logout"), parse_mode = "Markdown")
+
+
+# /lang #
 @dp.message(commands = ['lang'])
 async def lang_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH and message.from_user.id == message.chat.id:
@@ -395,6 +481,8 @@ async def lang_mess(message: types.Message):
         kb = types.InlineKeyboardMarkup(inline_keyboard = kbd)
         await message.reply(lng.getmess(message, "lang_choose"), parse_mode = "Markdown", reply_markup = kb)
 
+
+# /vuln #
 @dp.message(commands = ['vuln'])
 async def vuln_mess(message: types.Message):
     query = message.text.replace('/vuln', '').replace(f'@{BOT_USERNAME}', '').strip()
@@ -403,6 +491,8 @@ async def vuln_mess(message: types.Message):
     else:
         await message.reply(lng.getmess(message, "nothing"), parse_mode = "Markdown")
 
+
+# /remvuln #
 @dp.message(commands = ['remvuln'])
 async def remvuln_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -412,6 +502,8 @@ async def remvuln_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
 
+
+# /addvuln #
 @dp.message(commands = ['addvuln'])
 async def addvuln_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -421,6 +513,8 @@ async def addvuln_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
 
+
+# /remcode #
 @dp.message(commands = ['remcode'])
 async def remcode_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -430,6 +524,8 @@ async def remcode_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
 
+
+# /addcode #
 @dp.message(commands = ['addcode'])
 async def addcode_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -439,6 +535,8 @@ async def addcode_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
 
+
+# /remcost #
 @dp.message(commands = ['remcost'])
 async def remcost_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -448,6 +546,7 @@ async def remcost_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
 
+# /addcost #
 @dp.message(commands = ['addcost'])
 async def addcost_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
@@ -457,16 +556,22 @@ async def addcost_mess(message: types.Message):
         else:
             await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
 
+
+# /listcode #
 @dp.message(commands = ['listcode'])
 async def listcode_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
         await message.reply(cost_code_reactor(message.text.replace('/listcode', '').strip(), 'code.data', full = True), parse_mode = "Markdown")
 
+
+# /listcost #
 @dp.message(commands = ['listcost'])
 async def listcode_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
         await message.reply(cost_code_reactor(message.text.replace('/listcost', '').strip(), 'cost.data', full = True), parse_mode = "Markdown")
 
+
+# /pw, /pws #
 @dp.message(commands = ['pw', 'pws'])
 async def search_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
@@ -520,6 +625,8 @@ async def search_mess(message: types.Message):
                         await message.reply(lng.getmess(message, 'nothing'), 
                             parse_mode = "Markdown", reply_markup = kbd if len(macs) > 0 else None)
 
+
+# /wps #
 @dp.message(commands = ['wps'])
 async def wps_mess(message: types.Message, inline = None):
     if users.getstatus(message if message else inline['message']) == Status.AUTH or users.getstatus(message if message else inline['message']) == Status.MAYDAY:
@@ -565,6 +672,8 @@ async def wps_mess(message: types.Message, inline = None):
                 else:
                     return lng.getmess(message, 'nothing_wps')
 
+
+# /wpsg #
 @dp.message(commands = ['wpsg'])
 async def wpsg_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
@@ -584,38 +693,16 @@ async def wpsg_mess(message: types.Message):
                     built += SEPARATOR
                 await message.reply(built, parse_mode = "HTML")
 
-"""
+
+# /whatis #
+'''
 @dp.message(commands = ['whatis'])
 async def who_mess(message: types.Message):
-    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
-        query = message.text.replace('/whatis ', '').replace(f'@{BOT_USERNAME}', '').strip()
-        if query == '':
-            await message.reply(lang.get(ulang(uid), 'empty'), parse_mode = "Markdown")
-        else:
-            try:
-                mac = [m.upper().replace('-', ':') for m in re.findall(MAC, query)][0]
-            finally:
-                s = requests.Session()
-                s.post(f'{SERVICE_URL}/user.php?a=login', 
-                    data = {'login': users.data[str(message.from_user.id)]['login'], 
-                        'password': users.data[str(message.from_user.id)]['pass']})
-                get = s.post(f'{SERVICE_URL}/3wifi.php?a=devicemac', data = {'bssid': mac}).json()
-                s.get(f'{SERVICE_URL}/user.php?a=logout6{s.get(f"{SERVICE_URL}/user.php?a=token").json()["token"]}')
-                if get['result'] == True:
-                    mess = f'`{mac}` {lng.getmess(message, "who")}:\n'
-                    mess += SEPARATOR
-                    maxi = 10
-                    limiter = 0
-                    for s in get['scores']:
-                        if limiter < maxi:
-                            limiter += 1
-                            mess += f'`{s["name"]}`\n{lng.getmess(message, "w_score")}: `{s["score"] * 100:.2f}%`\n'
-                            mess += SEPARATOR
-                    await message.reply(mess, parse_mode = "Markdown")
-                else:
-                    await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
-"""
+    await.message('Soon.')
+'''
 
+
+# /where #
 @dp.message(commands = ['where'])
 async def where_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
@@ -624,7 +711,7 @@ async def where_mess(message: types.Message):
             await message.reply(lang.get(ulang(uid), 'empty'), parse_mode = "Markdown")
         else:
             try:
-                mac = [m for m in re.findall(MAC, query)][0]
+                mac = re.findall(MAC, query)[0]
             finally:
                 out = subprocess.check_output(['geomac', mac]).decode('utf-8').split('\n')
                 if out[1] == 'no results':
@@ -640,18 +727,21 @@ async def where_mess(message: types.Message):
                     await message.reply(built, parse_mode = "Markdown", disable_web_page_preview = True)
                     await bot.send_location(message.chat.id, longitude = lon, latitude = lat, reply_to_message_id = message.message_id)
 
+
+# User login handler #
 @dp.message(F.func(lambda F: users.getstatus(F) == Status.LOGIN) & (F.from_user.id == F.chat.id))
 async def login_handler(message: types.Message):
-    users.mod(mess = message, login = message.text)
+    users.mod(mess = message, key = f' {message.text}')
     await message.reply(lng.getmess(message, "password_wait"), parse_mode = "Markdown")
 
+
+# User password handler #
 @dp.message((F.func(lambda F: users.getstatus(F) == Status.PASS)) & (F.from_user.id == F.chat.id))
 async def password_handler(message: types.Message):
-    users.mod(mess = message, password = message.text)
     try:
         r = requests.post(f"{SERVICE_URL}/api/apikeys", json = {
-            'login': users.data[str(message.from_user.id)]['login'],
-            'password': users.data[str(message.from_user.id)]['pass'],
+            'login': users.data[str(message.from_user.id)]['key'].strip(),
+            'password': message.text,
             'genread': True}).json()
         if r['result']:
             if r['profile']['level'] > 0:
@@ -669,16 +759,18 @@ async def password_handler(message: types.Message):
                             uid = f'`{message.from_user.id}`',
                             username = f"@{message.from_user.username}" if message.from_user.username else ""), parse_mode = "Markdown")
         elif r['error'] == 'loginfail':
-            users.mod(message, login = ' ', password = ' ', key = ' ')
+            users.mod(message, key = ' ')
             await message.reply(lng.getmess(message, "bad_cred"))
         elif r['error'] == 'lowlevel':
-            users.mod(message, login = ' ', password = ' ', key = ' ')
+            users.mod(message, key = ' ')
             await message.reply(lng.getmess(message, "banned"))
     except:
         pass
 
+
+# Mayday users and Admins handler #
 @dp.message((F.text.in_(users.freecodes())) & (F.from_user.id == F.chat.id) | (F.text.in_(users.freeacodes())) & (F.from_user.id == F.chat.id))
-async def add_admin_add_user_hanler(message: types.Message):
+async def add_admin_add_user_handler(message: types.Message):
     if users.admin(message) == False:
         if message.text in users.freecodes() and cfg.mayday == '1':
             users.mod(mess = message , code = message.text)
@@ -687,6 +779,8 @@ async def add_admin_add_user_hanler(message: types.Message):
             users.mod(mess = message , acode = message.text)
             await message.reply(lng.getmess(message, "admin_added"))
 
+
+# Egg or what? #
 @dp.message(F.from_user.id == F.chat.id)
 async def others_inside(message: types.Message):
     if users.getstatus(message) == Status.UNAUTH:
@@ -696,6 +790,8 @@ async def others_inside(message: types.Message):
         if 'героям слава' in mtl or 'хейт лисички' in mtl or 'my name is jhon cina' in mtl:
             await message.reply(lng.getmess(message, "egg"))
 
+
+# Reactor #
 @dp.message()
 async def others_outside(message: types.Message):
     if users.getstatus(message) == Status.UNAUTH:
@@ -704,6 +800,8 @@ async def others_outside(message: types.Message):
         elif cost_code_reactor(message.text, 'code.data'):
             await message.reply('[# Информация о покупке #](https://t.me/routerscan/145429)\n[# Purchase Information #](https://t.me/routerscan/145429)', parse_mode = "Markdown", disable_web_page_preview = True)
 
+
+# Language callback #
 @dp.callback_query(LangCallback.filter(F.lang.in_(lng.langs())))
 async def language_handler(query: types.CallbackQuery, callback_data: LangCallback):
     to_edit_id = query.message.message_id
@@ -712,6 +810,8 @@ async def language_handler(query: types.CallbackQuery, callback_data: LangCallba
         users.mod(query, language = callback_data.lang)
         await bot.edit_message_text(lng.getmess(query, "lang_chosen"), chat_id = chat_id, message_id = to_edit_id)
 
+
+# Mayday callback #
 @dp.callback_query(MaydayCallback.filter(F.turn.in_([0, 1])))
 async def mayday_handler(query: types.CallbackQuery, callback_data: MaydayCallback):
     to_edit_id = query.message.message_id
@@ -736,6 +836,8 @@ async def mayday_handler(query: types.CallbackQuery, callback_data: MaydayCallba
                 await bot.edit_message_text(f'{lng.getmess(query, "mayday_state")}: `{lng.getmess(query, "off")}`', 
                     chat_id = chat_id, message_id = to_edit_id, parse_mode = "Markdown") 
 
+
+# WPS callback #
 @dp.callback_query(WpsCallback.filter(F.wps == 1))
 async def wps_handler(query: types.CallbackQuery, callback_data: WpsCallback):
     to_edit_id = query.message.message_id
@@ -747,5 +849,7 @@ async def wps_handler(query: types.CallbackQuery, callback_data: WpsCallback):
     else:
         await bot.answer_callback_query(callback_query_id = query.id, text = lng.getmess(message, 'wps_callback_no'), show_alert = True)
 
+
+# Go go power rangers #
 if __name__ == '__main__':
     dp.run_polling(bot)
