@@ -118,12 +118,10 @@ class Users:
                 code = ' ', acode = ' ',
                 language = 'ua' if code == 'ua' else 'ru' if code == 'ru' else 'us')
             return Status.UNAUTH
-    def mod(self, mess = None, user_id = None, login = None, password = None,
-        key = None, code = None, acode = None, language = None):
+    def mod(self, mess = None, user_id = None, key = None, 
+    code = None, acode = None, language = None):
         user_id = str(mess.from_user.id) if user_id == None else user_id
         self.data[user_id] = {
-        'login': login if login else self.data[user_id]['login'],
-        'pass': password if password else self.data[user_id]['pass'],
         'key': key if key else self.data[user_id]['key'],
         'code': code if code else self.data[user_id]['code'],
         'acode': acode if acode else self.data[user_id]['acode'],
