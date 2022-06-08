@@ -628,7 +628,7 @@ async def where_mess(message: types.Message):
             await message.reply(lang.get(ulang(uid), 'empty'), parse_mode = "Markdown")
         else:
             try:
-                mac = [m.upper().replace('-', ':') for m in re.findall(MAC, query)][0]
+                mac = [m for m in re.findall(MAC, query)][0]
             finally:
                 out = subprocess.check_output(['geomac', mac]).decode('utf-8').split('\n')
                 if out[1] == 'no results':
