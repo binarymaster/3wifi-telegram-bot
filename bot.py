@@ -535,7 +535,7 @@ async def wps_mess(message: types.Message, inline = None):
             await message.reply(lng.getmess(message, "empty"), parse_mode = "Markdown")
         else:
             try:
-                macs = [m.upper().replace('-', ':') for m in re.findall(MAC, query)]
+                macs = [m for m in re.findall(MAC, query)]
             finally:
                 uid = str(message.from_user.id) if message else str(inline['message'].from_user.id)
                 p = {'key': users.data[uid]['key'] if users.getstatus(message if message else inline['message']) == Status.AUTH else ADMIN_KEY, 
