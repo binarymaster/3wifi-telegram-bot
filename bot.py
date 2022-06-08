@@ -101,14 +101,12 @@ class Users:
             json.dump(self.data, c, indent = 4)
     def getstatus(self, mess):
         try:
-            if self.data[str(mess.from_user.id)]['login'] == ' ':
+            if self.data[str(mess.from_user.id)]['key'] == ' ':
                 return Status.UNAUTH
-            elif self.data[str(mess.from_user.id)]['login'] == '///login///':
+            elif self.data[str(mess.from_user.id)]['key'] == 'login':
                 return Status.LOGIN
-            elif self.data[str(mess.from_user.id)]['pass'] == ' ':
+            elif self.data[str(mess.from_user.id)]['key'] == 'pass':
                 return Status.PASS
-            elif self.data[str(mess.from_user.id)]['key'] == ' ':
-                return Status.UNAUTH
             if self.data[str(mess.from_user.id)]['code'] != ' ':
                 return Status.MAYDAY
             else:
