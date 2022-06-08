@@ -577,7 +577,7 @@ async def wpsg_mess(message: types.Message):
             await message.reply(lng.getmess(message, 'empty'), parse_mode = "Markdown")
         else:
             try:
-                mac = [m.upper().replace('-', ':') for m in re.findall(MAC, query)][0]
+                mac = [m for m in re.findall(MAC, query)][0]
             finally:
                 gen = wpspin.WPSpin()
                 gen = gen.getAll(mac)
