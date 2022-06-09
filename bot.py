@@ -708,22 +708,21 @@ async def where_mess(message: types.Message):
     if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
         query = message.text.replace('/where ', '').replace(f'@{BOT_USERNAME}', '').strip()
         if query == '':
-            await message.reply(lang.get(ulang(uid), 'empty'), parse_mode = "Markdown")
+            await message.reply(lng.getmess(message, 'empty'), parse_mode = "Markdown")
         else:
             try:
                 mac = re.findall(MAC, query)[0]
             finally:
                 out = subprocess.check_output(['geomac', mac]).decode('utf-8').split('\n')
                 if out[1] == 'no results':
-                    await message.reply(lang.get(ulang(uid), 'nothing'), parse_mode = "Markdown")
+                    await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
                 else:
                     splitter = out[1].split('|')[1].split(',')
                     lat = splitter[0].strip()
                     lon = splitter[1].strip()
-                    data = {'mac': mac, 'lat': lat, 'lon': lon}
-                    built = f'{data["mac"]}\n`{data["lon"]}, {data["lat"]}`\n{lng.getmess(message, "s_maps")}: '
-                    built += f'[3WiFi]({SERVICE_URL}/map?lat={data["lat"]}&lon={data["lon"]}), '
-                    built += f'[Google](https://www.google.com/maps/search/?api=1&query={data["lon"]},{data["lat"]})\n'
+                    built = f'{mac}\n`{lat}, {lon}`\n{lng.getmess(message, "s_maps")}: '
+                    built += f'[3WiFi]({SERVICE_URL}/map?lat={lat}&lon={lon}), '
+                    built += f'[Google](https://www.google.com/maps/search/?api=1&query={lat},{lon})\n'
                     await message.reply(built, parse_mode = "Markdown", disable_web_page_preview = True)
                     await bot.send_location(message.chat.id, longitude = lon, latitude = lat, reply_to_message_id = message.message_id)
 
