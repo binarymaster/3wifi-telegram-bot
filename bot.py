@@ -85,11 +85,10 @@ class Config:
         code = ''.join(sample(string.ascii_letters + string.digits, 16))
         while code in check:
             code = ''.join(sample(string.ascii_letters + string.digits, 16))
-        else:
-            if t == 'acodes': self.acodes.append(code)
-            else: self.codes.append(code)
-            self.update()
-            return code
+        if t == 'acodes': self.acodes.append(code)
+        else: self.codes.append(code)
+        self.update()
+        return code
 
 
     def remcode(self, code, t):
@@ -122,14 +121,14 @@ class Users:
 
     def getstatus(self, mess):
         try:
-            if self.data[str(mess.from_user.id)]['key'] == '-':
+            if self.data[str(mess.from_user.id)]['code'] != ' ':
+                return Status.MAYDAY
+            elif self.data[str(mess.from_user.id)]['key'] == '-':
                 return Status.UNAUTH
             elif self.data[str(mess.from_user.id)]['key'] == '+':
                 return Status.LOGIN
             elif self.data[str(mess.from_user.id)]['key'][0] == ' ':
                 return Status.PASS
-            if self.data[str(mess.from_user.id)]['code'] != ' ':
-                return Status.MAYDAY
             else:
                 return Status.AUTH
 
@@ -187,7 +186,7 @@ class Users:
         users = {}
         for d in self.data:
             if self.data[d]['code'] != ' ':
-                userss[d] = self.data[d]
+                users[d] = self.data[d]
         return users
 
 
@@ -207,10 +206,10 @@ class Users:
         return list(set(cfg.acodes) - set(used)) + list(set(used) - set(cfg.acodes))
 
 
-    def security(self, login):
+    def security(self, key):
         unsec = []
         for u in users.data:
-            if users.data[u]['login'] == login:
+            if users.data[u]['key'] == key:
                 unsec.append(u)
         return unsec
 
@@ -261,8 +260,9 @@ def splitter(mess):
                 app += blk + SEPARATOR
         return mess
     else:
-        mess = list().append(mess)
-        return mess
+        m = []
+        m.append(mess)
+        return m
 
 
 # Reactions [vuln, invites] #
@@ -376,28 +376,30 @@ async def users_mess(message: types.Message):
             if adm == {}:
                 await message.reply(lng.getmess(message, "adm_noadmins"), parse_mode = "Markdown")
             else:
-                mess = lng.getmess(message, "adm_admins") + ': \n'
+                mess = lng.getmess(message, "adm_admins") + ':\n'
                 for admin in adm:
-                    mess += f'{lng.getmess(message, "users_id")} : {admin}\n'
-                    mess += f'{lng.getmess(message, "code")} : {adm[admin]["acode"]}\n'
-                    mess += f'{lng.getmess(message, "remove")} : /deladmin{user}\n'
+                    mess += f'{lng.getmess(message, "users_id")} : `{admin}`\n'
+                    mess += f'{lng.getmess(message, "code")} : `{adm[admin]["acode"]}`\n'
+                    mess += f'{lng.getmess(message, "rem")} : /deladmin{admin}\n'
                     mess += SEPARATOR
                 mess = splitter(mess)
                 for m in mess:
                     await message.reply(m, parse_mode = "Markdown")
-        mayusers = users.maydayusers(message)
-        if mayusers == {}:
+        if cfg.mayday == 0:
             await message.reply(f'{lng.getmess(message, "mayday_state")}: `{lng.getmess(message, "off")}`', parse_mode = "Markdown")
         else:
-            mess = lng.getmess(message, "mayday_users")
-            for user in mayusers:
-                mess += f'{lng.getmess(message, "users_id")} : {user}\n'
-                mess += f'{lng.getmess(message, "code")} : {mayusers[user]["code"]}\n'
-                mess += f'{lng.getmess(message, "remove")} : /del{user}\n'
-                mess += SEPARATOR
-            mess = splitter(mess)
-            for m in mess:
-                await message.reply(m, parse_mode = "Markdown")
+            await message.reply(f'{lng.getmess(message, "mayday_state")}: `{lng.getmess(message, "on")}`', parse_mode = "Markdown")
+            mayusers = users.maydayusers(message)
+            if mayusers != {}:
+                mess = lng.getmess(message, "mayday_users") + ':\n'
+                for user in mayusers:
+                    mess += f'{lng.getmess(message, "users_id")} : `{user}`\n'
+                    mess += f'{lng.getmess(message, "code")} : `{mayusers[user]["code"]}`\n'
+                    mess += f'{lng.getmess(message, "rem")} : /del{user}\n'
+                    mess += SEPARATOR
+                mess = splitter(mess)
+                for m in mess:
+                    await message.reply(m, parse_mode = "Markdown")
 
 
 # /add #
@@ -419,9 +421,9 @@ async def add_admin_mess(message: types.Message):
 async def del_mess(message: types.Message):
     if users.admin(message) == True and message.from_user.id == message.chat.id:
         user_id = message.text.replace('/del', '').strip()
-        users.mod(user_id = user_id, login = ' ', password = ' ',
-            key = ' ', code = ' ', acode = ' ')
-        cfg.remcode(message.text, "codes")
+        cfg.remcode(users.data[user_id]['code'], "codes")
+        users.mod(user_id = user_id, key = '-',
+            code = ' ', acode = ' ')
         await message.reply(lng.getmess(message, "user_del"))
 
 
@@ -430,8 +432,8 @@ async def del_mess(message: types.Message):
 async def deladmin_mess(message: types.Message):
     if users.super(message) == True and message.from_user.id == message.chat.id:
         user_id = message.text.replace('/deladmin', '').strip()
+        cfg.remcode(users.data[user_id]['acode'], "acodes")
         users.mod(user_id = user_id, acode = ' ')
-        cfg.remcode(message.text, "acodes")
         await message.reply(lng.getmess(message, "adm_del"))
 
 
@@ -588,7 +590,7 @@ async def search_mess(message: types.Message):
             except:
                 query = query.strip()
             finally:
-                    p = {'key': users.data[str(message.from_user.id)]['key'] if users.getstatus(message) == Status.AUTH else ADMIN_KEY, 
+                    p = {'key': users.data[str(message.from_user.id)]['key'] if users.getstatus(message) == Status.AUTH else cfg.key, 
                         'essid': query if query != [] else '*', 
                         'bssid': [m for m in macs] if macs != [] else '*',
                         'sens': True if com == '/pws' else False
@@ -642,7 +644,7 @@ async def wps_mess(message: types.Message, inline = None):
                 macs = [m for m in re.findall(MAC, query)]
             finally:
                 uid = str(message.from_user.id) if message else str(inline['message'].from_user.id)
-                p = {'key': users.data[uid]['key'] if users.getstatus(message if message else inline['message']) == Status.AUTH else ADMIN_KEY, 
+                p = {'key': users.data[uid]['key'] if users.getstatus(message if message else inline['message']) == Status.AUTH else cfg.key, 
                     'bssid': [m for m in macs]}
                 r = requests.post(f'{SERVICE_URL}/api/apiwps', json = p).json()
                 if r['result'] == True and r['data'] != []:
@@ -752,7 +754,7 @@ async def password_handler(message: types.Message):
                         break
                 users.mod(message, key = key)
                 await message.reply(lng.getmess(message, "logged_in"), parse_mode = "Markdown")
-                for user in users.security(users.data[str(message.from_user.id)]['login']):
+                for user in users.security(users.data[str(message.from_user.id)]['key']):
                     if user != str(message.from_user.id):
                         await bot.send_message(user, lng.getmessbyuid(user, "security").format(
                             name = f'{message.from_user.first_name if message.from_user.first_name else ""} {message.from_user.last_name if message.from_user.last_name else ""}',
@@ -769,7 +771,7 @@ async def password_handler(message: types.Message):
 
 
 # Mayday users and Admins handler #
-@dp.message((F.text.in_(users.freecodes())) & (F.from_user.id == F.chat.id) | (F.text.in_(users.freeacodes())) & (F.from_user.id == F.chat.id))
+@dp.message((F.func(lambda F: F.text in users.freecodes() or F.text in users.freeacodes())) & (F.from_user.id == F.chat.id))
 async def add_admin_add_user_handler(message: types.Message):
     if users.admin(message) == False:
         if message.text in users.freecodes() and cfg.mayday == '1':
@@ -832,6 +834,9 @@ async def mayday_handler(query: types.CallbackQuery, callback_data: MaydayCallba
                     chat_id = chat_id, message_id = to_edit_id)
             elif callback_data.turn == 1:
                 cfg.mayday = '0'
+                cfg.codes = [];
+                for u in users.data:
+                    users.mod(user_id = u, code = ' ')
                 cfg.update()
                 await bot.edit_message_text(f'{lng.getmess(query, "mayday_state")}: `{lng.getmess(query, "off")}`', 
                     chat_id = chat_id, message_id = to_edit_id, parse_mode = "Markdown") 
