@@ -364,7 +364,8 @@ async def help_mess(message: types.Message):
                 lng.getmess(message, "help"), parse_mode = "Markdown")
         else:
             await message.reply(lng.getmess(message, "help"), parse_mode = "Markdown")
-
+	else:
+		await message.reply(lng.getmess(message, "help"), parse_mode = "Markdown")
 
 # /users #
 @dp.message(commands = ['users'])
