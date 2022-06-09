@@ -14,6 +14,5 @@
 7. Added **"Mayday" mode**
 8. Added automatic answers to popular questions
 9. Supports multiple MAC search
-11. Accepts MAC addresses with hyphens
 
 ---
