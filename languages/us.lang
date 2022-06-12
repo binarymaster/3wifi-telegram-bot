@@ -46,6 +46,7 @@
 	"users_code":"Temporary code",
 	"w_name":"Name",
 	"w_score":"Score",
+	"w_count":"Count",
 	"w_value":"PIN",
 	"who":"can be",
 	"wps_callback_no":"This button is not for you",
