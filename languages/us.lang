@@ -33,7 +33,7 @@
 	"probably":"Probably `{mac}` is:",
 	"rem":"Remove",
 	"removed":"Removed",
-	"s_bssid":"Name",
+	"s_bssid":"MAC",
 	"s_essid":"MAC",
 	"s_key":"Password",
 	"s_maps":"Maps",
