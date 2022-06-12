@@ -761,7 +761,7 @@ async def password_handler(message: types.Message):
                             uid = f'`{message.from_user.id}`',
                             username = f"@{message.from_user.username}" if message.from_user.username else ""), parse_mode = "Markdown")
         elif r['error'] == 'loginfail':
-            users.mod(message, key = ' ')
+            users.mod(message, key = '-')
             await message.reply(lng.getmess(message, "bad_cred"))
         elif r['error'] == 'lowlevel':
             users.mod(message, key = ' ')
