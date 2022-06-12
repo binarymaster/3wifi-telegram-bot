@@ -30,6 +30,7 @@
 	"okay":"Okay",
 	"on":"on",
 	"password_wait":"Waiting for password",
+	"probably":"Probably `{mac}` is:",
 	"rem":"Remove",
 	"removed":"Removed",
 	"s_bssid":"Name",
