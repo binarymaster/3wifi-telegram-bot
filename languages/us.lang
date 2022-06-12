@@ -34,7 +34,7 @@
 	"rem":"Remove",
 	"removed":"Removed",
 	"s_bssid":"MAC",
-	"s_essid":"MAC",
+	"s_essid":"Name",
 	"s_key":"Password",
 	"s_maps":"Maps",
 	"s_time":"Uploaded",
