@@ -46,6 +46,7 @@
 	"users_code":"Временный код",
 	"w_name":"Имя",
 	"w_score":"Шанс",
+	"w_count":"Кол-во",
 	"w_value":"PIN",
 	"who":"может быть",
 	"wps_callback_no":"Эта кнопка не для тебя",
