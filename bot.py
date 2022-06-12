@@ -764,7 +764,7 @@ async def password_handler(message: types.Message):
             users.mod(message, key = '-')
             await message.reply(lng.getmess(message, "bad_cred"))
         elif r['error'] == 'lowlevel':
-            users.mod(message, key = ' ')
+            users.mod(message, key = '-')
             await message.reply(lng.getmess(message, "banned"))
     except:
         pass
