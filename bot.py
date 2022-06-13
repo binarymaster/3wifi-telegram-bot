@@ -698,11 +698,34 @@ async def wpsg_mess(message: types.Message):
 
 
 # /whatis #
-'''
 @dp.message(commands = ['whatis'])
-async def who_mess(message: types.Message):
-    await.message('Soon.')
-'''
+async def whatis_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        query = message.text.replace('/whatis', '').replace(f'@{BOT_USERNAME}', '').strip()
+        if query == '':
+            await message.reply(lng.getmess(message, 'empty'), parse_mode = "Markdown")
+        else:
+            try:
+                mac = [m for m in re.findall(MAC, query)][0]
+            finally:
+                uid = str(message.from_user.id)
+                p = {'key': users.data[uid]['key'] if users.getstatus(message) == Status.AUTH else cfg.key,
+                    'bssid': mac}
+                r = requests.post(f'{SERVICE_URL}/api/apidev', json = p).json()
+                if r['result'] == True and r['data'] != []:
+                    built = lng.getmess(message, "probably").format(mac = mac) + '\n'
+                    built += SEPARATOR
+                    for mac in r["data"]:
+                        for dev in r["data"][mac]:
+                            for s in dev:
+                                if s == 'score':
+                                    built += lng.getmess(message, f"w_{s}") + f": `{dev[s] * 100:.2f}`%\n"
+                                else:
+                                    built += lng.getmess(message, f"w_{s}") + f": `{dev[s]}`\n"
+                            built += SEPARATOR
+                    await message.reply(built, parse_mode = "Markdown")
+                else:
+                    await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
 
 
 # /where #
