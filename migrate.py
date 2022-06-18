@@ -6,7 +6,6 @@ with open('config.json', 'r', encoding = 'utf-8') as conf:
 with open('_config.json', 'r', encoding = 'utf-8') as conf:
 	json.dump(c, conf, indent = 4)
 
-c.pop('webhook_ip')
 n = c.pop('3wifi_apikey')
 c['key'] = n
 c['mayday'] =  "0"
