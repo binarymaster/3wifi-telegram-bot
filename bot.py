@@ -1,545 +1,883 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
+# Imports #
+import os
+import asyncio
 import json
 import re
+from random import sample
+import string
 import logging
 import requests
-from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove,
-                      InlineKeyboardButton, InlineKeyboardMarkup)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler, CallbackQueryHandler)
-
-SERVICE_DOMAIN = '3wifi.stascorp.com'
-SERVICE_URL = 'https://' + SERVICE_DOMAIN
-USER_KEYS_DB_FILENAME = 'userkeys.json'
-
-# Initializing settings
-try:
-    with open('config.json', 'r', encoding='utf-8') as file:
-        config = json.load(file)
-        TOKEN = config['bot_token']
-        IP = config['webhook_ip']
-        API_KEY = config['3wifi_apikey']
-except FileNotFoundError:
-    print('Please provide the following credentials')
-    TOKEN = input('Telegram bot API token: ')
-    IP = input('IP for webhook: ')
-    API_KEY = input('3WiFi API read key: ')
-    config = {
-        'bot_token': TOKEN,
-        'webhook_ip': IP,
-        '3wifi_apikey': API_KEY
-    }
-    with open('config.json', 'w', encoding='utf-8') as outf:
-        json.dump(config, outf, indent=4)
-
-# Initializing user API keys database
-try:
-    with open(USER_KEYS_DB_FILENAME, 'r', encoding='utf-8') as file:
-        USER_KEYS = json.load(file)
-except FileNotFoundError:
-    USER_KEYS = dict()
-    with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
-        json.dump(USER_KEYS, outf, indent=4)
-
-# Single BSSID pattern
-bssid_pattern = re.compile(r"^(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})$")
-# BSSID multi-line list pattern. Maximum 100 BSSID
-bssid_list_pattern = re.compile(r"(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})(?:[\n](?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})){0,99}")
-
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO)
-logger = logging.getLogger(__name__)
+import wpspin                
+import subprocess
+from enum import IntEnum
+from datetime import datetime 
+import flag
 
 
-class ConversationStates():
-    LOGIN_PROMPT = 1
-    PASSWORD_PROMPT = 2
-    BSSID_PROMPT = 3
-    ESSID_PROMPT = 4
+# Aiogram import #
+from aiogram import Bot
+from aiogram import Dispatcher
+from aiogram import types
+from aiogram import F
+from aiogram.dispatcher.filters.callback_data import CallbackData
 
 
-def scoreformat(score):
-    answer = ''
-    score *= 100
-    if score < 1:
-        answer = "{0:.2f}".format(score)
-    elif score < 10:
-        answer = "{0:.1f}".format(score)
-    else:
-        answer = str(round(score))
-    answer += '%'
-    return answer
+# Kinda static #
+SERVICE_URL = 'https://3wifi.stascorp.com'
+USERS_FILE = 'users.json'
+CONFIG_FILE = 'config.json'
+LANG_DIR = 'languages'
+SEPARATOR = '================\n'
+BOT_USERNAME = "wifi3_bot"
 
 
-def getPersonalAPIkey(user_id):
-    """Gets 3WiFi API key by Telegram user ID"""
-    user_id = str(user_id)
-    if user_id in USER_KEYS:
-        return USER_KEYS[user_id]
-    else:
-        return API_KEY
+# Status class #
+class Status(IntEnum):
+    UNAUTH = 0
+    LOGIN = 1
+    PASS = 2
+    AUTH = 3
+    MAYDAY = 4
 
 
-def formatap(data):
-    key_labels = {
-        'essid': 'ESSID',
-        'bssid': 'BSSID',
-        'key': 'Password',
-        'wps': 'WPS PIN',
-        'time': 'Date'
-    }
-    order = ['essid', 'bssid', 'key', 'wps', 'time']    # Order of values in the answer
-    copyable = ['essid', 'bssid', 'key', 'wps']   # Values that can be copied (monospaced font)
-    answer = ''
-    for element in order:
-        if (element in data) and data[element]:   # Check if value is not empty
-            key, value = element, data[element]
-            if (key in copyable) and (value != '<empty>'):
-                answer += f'{key_labels[key]}: `{value}`\n'
+# Configuration class #
+class Config:
+    
+    
+    def __init__(self, path):
+        try:
+            self.path = path
+            with open(self.path, 'r', encoding = 'utf-8') as c:
+                raw = json.load(c)
+            self.token = raw['token']
+            self.key = raw['key']
+            self.mayday = raw['mayday']
+            self.codes = raw['codes']
+            self.acodes = raw['acodes']
+        except FileNotFoundError:
+            print('No configuration file. Enter new parameters:')
+            self.token = input('Bot token > ')
+            self.key = input('Api Key > ')
+            self.mayday = input('Mayday (0 or 1) > ')
+            self.codes = []
+            self.acodes = []
+            self.update()
+
+
+    def update(self):
+        with open(self.path, 'w', encoding = 'utf-8') as c:
+            json.dump({
+                'token': self.token,
+                'key': self.key,
+                'mayday': self.mayday,
+                'codes': self.codes,
+                'acodes': self.acodes
+                }, c, indent = 4)
+
+
+    def code(self, t):
+        check = []
+        for u in users.data:
+            if users.data[u]['code'] != ' ':
+                check.append(users.data[u]['code'])
+            elif users.data[u]['acode'] != ' ':
+                check.append(users.data[u]['acode'])
+        code = ''.join(sample(string.ascii_letters + string.digits, 16))
+        while code in check:
+            code = ''.join(sample(string.ascii_letters + string.digits, 16))
+        if t == 'acodes': self.acodes.append(code)
+        else: self.codes.append(code)
+        self.update()
+        return code
+
+
+    def remcode(self, code, t):
+        if t == 'acodes': self.acodes.remove(code)
+        else: self.codes.remove(code)
+
+cfg = Config(CONFIG_FILE)
+
+
+# Users class #
+class Users:
+    
+
+    def __init__(self, path):
+        try:
+            self.path = path
+            with open(self.path, 'r', encoding = 'utf-8') as c:
+                self.data = json.load(c)
+
+        except FileNotFoundError:
+            with open(self.path, 'w', encoding = 'utf-8') as c:
+                self.data = {}
+                self.update()
+
+
+    def update(self):
+        with open(self.path, 'w', encoding = 'utf-8') as c:
+            json.dump(self.data, c, indent = 4)
+
+
+    def getstatus(self, mess):
+        try:
+            if self.data[str(mess.from_user.id)]['code'] != ' ':
+                return Status.MAYDAY
+            elif self.data[str(mess.from_user.id)]['key'] == '-':
+                return Status.UNAUTH
+            elif self.data[str(mess.from_user.id)]['key'] == '+':
+                return Status.LOGIN
+            elif self.data[str(mess.from_user.id)]['key'][0] == ' ':
+                return Status.PASS
             else:
-                answer += f'{key_labels[key]}: {value}\n'
-    if 'lat' in data:
-        answer += f"[Точка на карте]({SERVICE_URL}/map?lat={data['lat']}&lon={data['lon']})\n"
-    else:
-        answer += '- - - - -\n'
-    return answer
+                return Status.AUTH
+
+        except:
+            code = mess.from_user.language_code
+            self.mod(mess = mess, key = '-',
+                code = ' ', acode = ' ',
+                language = 'ua' if code == 'ua' else 'ru' if code == 'ru' else 'us')
+            return Status.UNAUTH
 
 
-def formatpin(data):
-    key_labels = {
-        'name': 'Name',
-        'value': 'Pin',
-        'score': 'Score'
-    }
-    order = ['name', 'value', 'score']    # Order of values in the answer
-    copyable = ['value']   # Values that can be copied (monospaced font)
-    answer = ''
-    for element in order:
-        if (element in data) and data[element]:   # Check if value is not empty
-            key, value = element, data[element]
-            if key == 'score':
-                value = scoreformat(value)
-            if key in copyable:
-                answer += f'{key_labels[key]}: `{value}`\n'
+    def mod(self, mess = None, user_id = None, key = None, 
+    code = None, acode = None, language = None):
+        user_id = str(mess.from_user.id) if user_id == None else user_id
+        self.data[user_id] = {
+        'key': key if key else self.data[user_id]['key'],
+        'code': code if code else self.data[user_id]['code'],
+        'acode': acode if acode else self.data[user_id]['acode'],
+        'language': language if language else self.data[user_id]['language']
+        }
+        self.update()
+
+
+    def admin(self, mess):
+        if self.data[str(mess.from_user.id)]['acode'] != ' ':
+            return True
+        elif self.data[str(mess.from_user.id)]['key'] == cfg.key:
+            return True
+        else: return False
+
+
+    def super(self, mess):
+        if self.data[str(mess.from_user.id)]['key'] == cfg.key:
+            return True
+        else: return False
+            
+
+    def lang(self, mess):
+        return self.data[str(mess.from_user.id)]['language']
+
+
+    def langbyuid(self, uid):
+        return self.data[uid]['language']
+
+
+    def admins(self, mess):
+        admins = {}
+        for d in self.data:
+            if self.data[d]['acode'] != ' ':
+                admins[d] = self.data[d]
+        return admins
+
+
+    def maydayusers(self, mess):
+        users = {}
+        for d in self.data:
+            if self.data[d]['code'] != ' ':
+                users[d] = self.data[d]
+        return users
+
+
+    def freecodes(self):
+        used = []
+        for u in users.data:
+            if users.data[u]['code'] in cfg.codes:
+                used.append(users.data[u]['code'])
+        return list(set(cfg.codes) - set(used)) + list(set(used) - set(cfg.codes))
+
+
+    def freeacodes(self):
+        used = []
+        for u in users.data:
+            if users.data[u]['acode'] in cfg.acodes:
+                used.append(users.data[u]['acode'])
+        return list(set(cfg.acodes) - set(used)) + list(set(used) - set(cfg.acodes))
+
+
+    def security(self, key):
+        unsec = []
+        for u in users.data:
+            if users.data[u]['key'] == key:
+                unsec.append(u)
+        return unsec
+
+users = Users(USERS_FILE)
+
+
+# Languages class #
+class Languages:
+    
+    
+    def __init__(self, path):
+        try:
+            self.data = {}
+            for f in os.listdir(path):
+                with open(f'{path}/{f}', 'r', encoding = 'utf-8') as l:
+                    self.data[f.replace('.lang', '')] = json.load(l)
+        except Exception as ex:
+            print(ex)
+
+
+    def langs(self):
+        return [l for l in self.data]
+
+
+    def getmess(self, mess, what):
+        return self.data[users.lang(mess)][what]
+
+
+    def getmessbyuid(self, uid, what):
+        return self.data[users.langbyuid(uid)][what]
+
+lng = Languages(LANG_DIR)
+
+
+# Message splitter #
+def splitter(mess):
+    if len(mess) > 4096:
+        splitmess = mess.split(SEPARATOR)
+        while '' in splitmess:
+            splitmess.remove('')
+        mess = []
+        app = ''
+        for blk in splitmess:
+            if len(app + blk) >= 4096:
+               mess.append(app)
+               app = blk + SEPARATOR
             else:
-                answer += f'{key_labels[key]}: {value}\n'
-    answer += '- - - - -\n'
-    return answer
-
-
-def formataps(values):
-    answer = ''
-    for value in values:
-        answer += formatap(value)
-    return answer
-
-
-def formatpins(values):
-    answer = ''
-    for value in values:
-        answer += formatpin(value)
-    return answer
-
-
-def getApiErrorDesc(error, user_id):
-    if error == 'cooldown':
-        return 'Узбагойся и попробуй ещё раз через 10 сек 😜'
-    elif error == 'loginfail':
-        return 'Ошибка авторизации в 3WiFi. Если вы ранее авторизовывались через /login, попробуйте сделать это снова или выйдите с помощью /logout'
-    elif error == 'lowlevel':
-        if str(user_id) in USER_KEYS:
-            return 'Недостаточно прав для выполнения команды. Возможно, ваш аккаунт 3WiFi заблокирован'
-        else:
-            return 'Недостаточно прав для выполнения команды. Вероятно, гостевой аккаунт заблокирован. Купить код приглашения можно тут: https://t.me/routerscan/15931'
+                app += blk + SEPARATOR
+        return mess
     else:
-        return 'Что-то пошло не так 😮 error: ' + error
+        m = []
+        m.append(mess)
+        return m
 
 
-def apiquery(user_id, bssid='*', essid=None, sensivity=False):
-    """Implements querying single AP by its BSSID/ESSID"""
-    api_key = getPersonalAPIkey(user_id)
-    url = f'{SERVICE_URL}/api/apiquery?key={api_key}&bssid={bssid}'
-    if essid is not None:
-        url += f'&essid={essid}'
-    if sensivity:
-        url += '&sens=true'
-    response = requests.get(url).json()
-
-    reply_markup = None
-    if not response['result']:
-        return getApiErrorDesc(response['error'], user_id), reply_markup
-    if len(response['data']) == 0:
-        if bssid != '*':
-            keyboard = [
-                [
-                    InlineKeyboardButton('Сгенерировать пин-коды WPS',
-                                         callback_data=f'{user_id}/{bssid}')
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-        return 'Нет результатов :(', reply_markup
-    return formataps(tuple(response['data'].values())[0]), reply_markup
+# Reactions [vuln, invites] #
+def vuln_reactor(text):
+    with open('vuln.data', 'r', encoding = 'utf-8') as vuln:
+        vulns = vuln.read().split('\n')
+    built = ''
+    for v in vulns:
+        if text.lower() in v.lower():
+            built += f'`{v}`\n'
+    return built if len(built) > 0 else None
 
 
-def apiwps(user_id, bssid):
-    """Implements generating PIN codes for single AP by its BSSID"""
-    api_key = getPersonalAPIkey(user_id)
-    response = requests.get(
-        f'{SERVICE_URL}/api/apiwps?key={api_key}&bssid={bssid}'
-    ).json()
-    if not response['result']:
-        return getApiErrorDesc(response['error'], user_id)
-    if len(response['data']) == 0:
-        return 'Нет результатов :('
-    return formatpins(response['data'][bssid.upper()]['scores'])
-
-
-def parseApDataArgs(args):
-    """Parsing BSSID and ESSID from /pw command arguments"""
-    if re.match(bssid_pattern, args[0]) is not None:
-        bssid = args[0]
-        if len(args) > 1:
-            essid = ' '.join(args[1:])
-        else:
-            essid = None
+def cost_code_reactor(text, f, full = None):
+    with open(f, 'r', encoding = 'utf-8') as t:
+        templates = t.read().split('\n')
+    while '' in templates:
+        templates.remove('')
+    if full:
+        fl = ''
+        for t in templates:
+            fl += f"`{t}`\n"
+        return fl
+    for t in templates:
+        if t.lower() in text.lower():
+            return True
     else:
-        bssid = '*'
-        essid = ' '.join(args)
-    return bssid, essid
+        return False
 
 
-def unknown(update, context):
-    """Handler for unknown commands"""
-    update.message.reply_text(
-        'Команда не найдена! Отправьте /help для получения информации по доступным командам'
-        )
-
-
-def help(update, context):
-    """Hadler for /help command"""
-    answer = '''{} бот!
-/pw BSSID и/или ESSID — поиск по MAC-адресу или имени точки (пример: /pw FF:FF:FF:FF:FF:FF или /pw netgear или /pw FF:FF:FF:FF:FF:FF VILTEL)
-/pws — то же самое, что /pw, но с учётом регистра (ESSID)
-/wps BSSID — поиск WPS пин-кодов по MAC-адресу (пример: /wps FF:FF:FF:FF:FF:FF)'''.format(SERVICE_DOMAIN)
-    private_commands = '''\n/login — авторизоваться с личным аккаунтом 3WiFi для снятия ограничений гостевого аккаунта
-/logout — выполнить выход из личного аккаунта 3WiFi'''
-    if update.message.chat.type == 'private':
-        answer += private_commands
-    update.message.reply_text(answer)
-
-
-def authorize(login, password, context, user_id):
-    """3WiFi authorization interface"""
-    r = requests.post(
-        f'{SERVICE_URL}/api/apikeys',
-        data={'login': login, 'password': password}
-    ).json()
-    if r['result']:
-        if r['profile']['level'] > 0:
-            user_id = str(user_id)
-            nickname = r['profile']['nick']
-            try:
-                apikey = list(filter(lambda x: x['access'] == 'read', r['data']))[0]['key']
-            except IndexError:
-                answer = 'Ошибка: аккаунт *{}* не имеет API-ключа на чтение. Получите его на сайте, затем повторите попытку авторизации.'.format(nickname)
-            else:
-                USER_KEYS[user_id] = apikey
-                with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
-                    json.dump(USER_KEYS, outf, indent=4)
-                answer = 'Вы успешно авторизованы как *{}*. Чтобы выйти, отправьте /logout'.format(nickname)
-                # Send security notification to users with the same token
-                for telegram_id, api_key in USER_KEYS.items():
-                    if (apikey == api_key) and (telegram_id != user_id) and (api_key != API_KEY):
-                        context.bot.send_message(
-                            chat_id=telegram_id,
-                            text='*Уведомление безопасности*\n[Пользователь](tg://user?id={}) только что авторизовался в боте с вашим аккаунтом 3WiFi.'.format(user_id),
-                            parse_mode='Markdown'
-                            )
-        else:
-            answer = 'Ошибка: уровень доступа аккаунта ниже уровня *пользователь*'
-    elif r['error'] == 'loginfail':
-        answer = 'Ошибка — проверьте логин и пароль'
-    elif r['error'] == 'lowlevel':
-        answer = 'Ошибка: ваш аккаунт заблокирован'
-    else:
-        answer = 'Что-то пошло не так 😮 error: {}'.format(r['error'])
-    return answer
-
-
-def login(update, context):
-    """Handler for /login command"""
-    if update.message.chat.type != 'private':
-        update.message.reply_text(
-            'Команда работает только в личных сообщениях (ЛС)'
-        )
-        return ConversationHandler.END
-    answer = 'Укажите логин:'
-    if context.args:
-        args = ' '.join(context.args)
-        if ':' in args:
-            login, password = args.split(':')[:2]
-            answer = authorize(
-                login, password, context, update.message.from_user.id
-            )
-            update.message.reply_text(answer, parse_mode='Markdown')
-            return ConversationHandler.END
-    update.message.reply_text(answer)
-    return ConversationStates.LOGIN_PROMPT
-
-
-def login_prompt(update, context):
-    context.user_data['login'] = update.message.text
-    update.message.reply_text('Укажите пароль:')
-    return ConversationStates.PASSWORD_PROMPT
-
-
-def password_prompt(update, context):
-    password = update.message.text
-    login = context.user_data['login']
-    answer = authorize(login, password, context, update.message.from_user.id)
-    update.message.reply_text(answer, parse_mode='Markdown')
-    return ConversationHandler.END
-
-
-def cancel_conversation(update, context):
-    '''Generic conversation canceler'''
-    update.message.reply_text(
-        'Операция отменена.',
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return ConversationHandler.END
-
-
-def logout(update, context):
-    """Handler for /logout command"""
-    if update.message.chat.type != 'private':
-        update.message.reply_text(
-            'Команда работает только в личных сообщениях (ЛС)'
-        )
-        return
-    user_id = str(update.message.from_user.id)
+# Editor #
+def changer(text, mode, f):
+    with open(f, 'r', encoding = 'utf-8') as data:
+        d = data.read().split('\n')
+        l1 = len(d)
     try:
-        USER_KEYS.pop(user_id)
-        with open(USER_KEYS_DB_FILENAME, 'w', encoding='utf-8') as outf:
-            json.dump(USER_KEYS, outf, indent=4)
-    except KeyError:
-        answer = 'Ошибка: невозможно выйти из аккаунта 3WiFi, т.к. вы не вошли'
-    else:
-        answer = 'Выход выполнен, API-ключ вашего аккаунта 3WiFi удалён из базы данных бота. Чтобы авторизоваться снова, воспользуйтесь командой /login'
-    update.message.reply_text(answer)
-
-
-def pw(update, context):
-    """Handler for /pw command"""
-    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pw BSSID/ESSID (пример: `/pw FF:FF:FF:FF:FF:FF VILTEL` или `/pw FF:FF:FF:FF:FF:FF` или `/pw netgear`)'
-    user_id = update.message.from_user.id
-    args = context.args
-    reply_markup = None
-    if len(args) > 0:
-        bssid, essid = parseApDataArgs(args)
-        answer, reply_markup = apiquery(user_id, bssid, essid)
-    elif update.message.chat.type == 'private':
-        reply_keyboard = [['↪ Пропустить']]
-        update.message.reply_text(
-            'Укажите BSSID:',
-            reply_markup=ReplyKeyboardMarkup(reply_keyboard,
-                                             one_time_keyboard=True,
-                                             resize_keyboard=True)
-        )
-        context.user_data['sensivity'] = False
-        return ConversationStates.BSSID_PROMPT
-    update.message.reply_text(
-        answer, parse_mode='Markdown', reply_markup=reply_markup)
-    return ConversationHandler.END
-
-
-def bssid_prompt(update, context):
-    t = update.message.text
-    if re.match(bssid_pattern, t) is not None:
-        reply_keyboard = [['↪ Пропустить']]
-        context.user_data['bssid'] = t
-        update.message.reply_text(
-            'Укажите ESSID:',
-            reply_markup=ReplyKeyboardMarkup(reply_keyboard,
-                                             one_time_keyboard=True,
-                                             resize_keyboard=True)
-        )
-        return ConversationStates.ESSID_PROMPT
-    elif re.match(r'↪ ', t) is not None:
-        # Skip the BSSID prompt
-        context.user_data['bssid'] = '*'
-        update.message.reply_text(
-            'Укажите ESSID:', reply_markup=ReplyKeyboardRemove())
-        return ConversationStates.ESSID_PROMPT
-    else:
-        update.message.reply_text(
-            'Ошибка: неверный формат BSSID. Укажите BSSID:')
-        return ConversationStates.BSSID_PROMPT
-
-
-def essid_prompt(update, context):
-    t = update.message.text
-    if re.match(r'↪ ', t) is not None:
-        # Skip the ESSID prompt
-        essid = None
-    else:
-        essid = t
-    bssid = context.user_data['bssid']
-    sensivity = context.user_data['sensivity']
-    answer, reply_markup = apiquery(
-        update.message.from_user.id, bssid, essid, sensivity
-    )
-    update.message.reply_text(
-        answer, parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
-    return ConversationHandler.END
-
-
-def pws(update, context):
-    """Handler for /pws command"""
-    answer = 'Ошибка: не передан BSSID или ESSID.\nПоиск по BSSID и/или ESSID выполняется так: /pws BSSID/ESSID (пример: `/pws FF:FF:FF:FF:FF:FF VILTEL` или `/pws FF:FF:FF:FF:FF:FF` или `/pws netgear`)'
-    user_id = update.message.from_user.id
-    args = context.args
-    if len(args) > 0:
-        bssid, essid = parseApDataArgs(args)
-        answer, reply_markup = apiquery(user_id, bssid, essid, sensivity=True)
-    elif update.message.chat.type == 'private':
-        update.message.reply_text('Укажите BSSID:')
-        context.user_data['sensivity'] = True
-        return ConversationStates.BSSID_PROMPT
-    update.message.reply_text(
-        answer, parse_mode='Markdown', reply_markup=reply_markup)
-    return ConversationHandler.END
-
-
-def wps(update, context):
-    """Handler for /wps command"""
-    answer = 'Поиск WPS пин-кодов выполняется так: /wps BSSID (пример: /wps FF:FF:FF:FF:FF:FF)'
-    user_id = update.message.from_user.id
-    args = context.args
-    if (len(args) == 1) and (re.match(bssid_pattern, args[0]) is not None):
-        answer = apiwps(user_id, args[0])
-    if len(answer) > 3900:
-        update.message.reply_text(
-            f'{answer[:3900]}\nСписок слишком большой — смотрите полностью на {SERVICE_URL}/wpspin',
-            parse_mode='Markdown'
-        )
-    else:
-        update.message.reply_text(answer, parse_mode='Markdown')
-
-
-def querybssidlist(update, context):
-    """Handler for message containing BSSID"""
-    user_id = update.message.from_user.id
-    bssid_list = update.message.text.splitlines()
-    # Filtering BSSID list with preversing order
-    seen = set()
-    bssid_list = [x.upper() for x in bssid_list if not (x in seen or seen.add(x))]
-    del seen
-
-    reply_markup = None
-    if len(bssid_list) == 1:
-        # Fetch 10 records for single BSSID
-        answer, reply_markup = apiquery(user_id, bssid=bssid_list[0])
-    else:
-        # Fetch one record per BSSID
-        response = requests.post(
-            f'{SERVICE_URL}/api/apiquery',
-            json={
-                'key': getPersonalAPIkey(user_id),
-                'bssid': bssid_list
-            }
-        ).json()
-        if not response['result']:
-            answer = getApiErrorDesc(response['error'], user_id)
-        elif len(response['data']) == 0:
-            answer = 'Нет результатов :('
+        if mode == 0:
+            d.remove(text)
+        elif mode == 1:
+            d.append(text)
+        l2 = len(d)
+        while '' in d:
+            d.remove('')
+        with open(f, 'w', encoding = 'utf-8') as data:
+            for n in d:
+                data.write(f"{n}\n")
+        if l1 < l2 or l2 < l1:
+            return True
         else:
-            data = response['data']
-            answer = ''
-            for bssid in bssid_list:
-                if bssid in data:
-                    answer += formatap(data[bssid][0])
-    update.message.reply_text(
-        answer, parse_mode='Markdown', reply_markup=reply_markup)
+            return False
+    except:
+        return False
 
 
-def callbackbutton(update, context):
-    """Handler for WPS PIN inline button"""
-    query = update.callback_query
-    initiator_id, bssid = query.data.split('/')
-    user_id = str(query.from_user.id)
-    if initiator_id != user_id:
-        query.answer(text='Эта кнопка предназначена для инициатора запроса')
+# Bot initialization #
+bot = Bot(token = cfg.token)
+dp = Dispatcher()
+
+
+# Callbacks #
+class WpsCallback(CallbackData, prefix = 'wps'):
+    wps: int
+
+
+class LangCallback(CallbackData, prefix = 'lang'):
+    lang: str
+
+
+class MaydayCallback(CallbackData, prefix = "md"):
+    turn: int
+
+
+# Logger setup #
+logform = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logging.basicConfig(format = logform, level = logging.DEBUG)
+log = logging.getLogger(__name__)
+
+
+# MAC filter #
+MAC = r'(?:[0-9A-Fa-f]{2}[:.-]){5}(?:[0-9A-Fa-f]{2})'
+
+# Bot body #
+
+# /start #
+@dp.message(commands = ['start'])
+async def start_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        await help_mess(message)
+    elif users.getstatus(message) == Status.UNAUTH:
+        await message.reply(lng.getmess(message, "start").format(url = SERVICE_URL), parse_mode = "Markdown")
+
+
+# /help #
+@dp.message(commands = ['help'])
+async def help_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        if users.admin(message) == True and message.from_user.id == message.chat.id:
+            await message.reply(lng.getmess(message, "adm_help") + 
+                lng.getmess(message, "help"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "help"), parse_mode = "Markdown")
     else:
-        query.answer()
-        old_text = query.message.text
-        query.edit_message_text(
-            text=f'{old_text}\n\n*Пин-коды WPS:*\n_Ожидайте…_',
-            parse_mode='Markdown'
-        )
-        answer = apiwps(initiator_id, bssid)
-        query.edit_message_text(
-            text=f'{old_text}\n\n*Пин-коды WPS:*\n{answer}',
-            parse_mode='Markdown'
-        )
+        await message.reply(lng.getmess(message, "help"), parse_mode = "Markdown")
+
+# /users #
+@dp.message(commands = ['users'])
+async def users_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        if users.super(message) == True:
+            adm = users.admins(message)
+            if adm == {}:
+                await message.reply(lng.getmess(message, "adm_noadmins"), parse_mode = "Markdown")
+            else:
+                mess = lng.getmess(message, "adm_admins") + ':\n'
+                for admin in adm:
+                    mess += f'{lng.getmess(message, "users_id")} : `{admin}`\n'
+                    mess += f'{lng.getmess(message, "code")} : `{adm[admin]["acode"]}`\n'
+                    mess += f'{lng.getmess(message, "rem")} : /deladmin{admin}\n'
+                    mess += SEPARATOR
+                mess = splitter(mess)
+                for m in mess:
+                    await message.reply(m, parse_mode = "Markdown")
+        if cfg.mayday == 0:
+            await message.reply(f'{lng.getmess(message, "mayday_state")}: `{lng.getmess(message, "off")}`', parse_mode = "Markdown")
+        else:
+            await message.reply(f'{lng.getmess(message, "mayday_state")}: `{lng.getmess(message, "on")}`', parse_mode = "Markdown")
+            mayusers = users.maydayusers(message)
+            if mayusers != {}:
+                mess = lng.getmess(message, "mayday_users") + ':\n'
+                for user in mayusers:
+                    mess += f'{lng.getmess(message, "users_id")} : `{user}`\n'
+                    mess += f'{lng.getmess(message, "code")} : `{mayusers[user]["code"]}`\n'
+                    mess += f'{lng.getmess(message, "rem")} : /del{user}\n'
+                    mess += SEPARATOR
+                mess = splitter(mess)
+                for m in mess:
+                    await message.reply(m, parse_mode = "Markdown")
 
 
-def error(update, context):
-    logger.warning('Update "%s" caused error "%s"', update, context.error)
+# /add #
+@dp.message(commands = ['add'])
+async def add_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        await message.reply(f'{lng.getmess(message, "users_code")}: `{cfg.code("codes")}`', parse_mode = "Markdown")
 
 
-updater = Updater(TOKEN, use_context=True)
-dp = updater.dispatcher
+# /addadmin #
+@dp.message(commands = ['addadmin'])
+async def add_admin_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        await message.reply(f'{lng.getmess(message, "admin_code")}: `{cfg.code("acodes")}`', parse_mode = "Markdown")
 
-auth_conversation = ConversationHandler(
-    entry_points=[CommandHandler("login", login, pass_args=True)],
-    states={
-        ConversationStates.LOGIN_PROMPT: [
-            MessageHandler(Filters.text & ~Filters.command, login_prompt)
-        ],
-        ConversationStates.PASSWORD_PROMPT: [
-            MessageHandler(Filters.text & ~Filters.command, password_prompt)
-        ]
-    },
-    fallbacks=[CommandHandler("cancel", cancel_conversation)]
-)
-ap_query_conversation = ConversationHandler(
-    entry_points=[
-        CommandHandler("pw", pw, pass_args=True),
-        CommandHandler("pws", pws, pass_args=True)
-    ],
-    states={
-        ConversationStates.BSSID_PROMPT: [
-            MessageHandler(Filters.text & ~Filters.command, bssid_prompt)
-        ],
-        ConversationStates.ESSID_PROMPT: [
-            MessageHandler(Filters.text & ~Filters.command, essid_prompt)
-        ]
-    },
-    fallbacks=[CommandHandler("cancel", cancel_conversation)],
-    conversation_timeout=600   # 10 minutes
-)
-dp.add_handler(auth_conversation)
-dp.add_handler(ap_query_conversation)
-dp.add_handler(CommandHandler("help", help))
-dp.add_handler(CommandHandler("start", help))
-dp.add_handler(CommandHandler("logout", logout))
-dp.add_handler(CommandHandler("wps", wps, pass_args=True))
-dp.add_handler(MessageHandler(Filters.regex(bssid_list_pattern) & ~Filters.command & Filters.private, querybssidlist))
-dp.add_handler(MessageHandler((Filters.text | Filters.command) & Filters.private, unknown))
-dp.add_handler(CallbackQueryHandler(callbackbutton))
-dp.add_error_handler(error)
 
-if IP == 'no':
-    updater.start_polling(poll_interval=.5)
-else:
-    updater.start_webhook(
-        listen='0.0.0.0',
-        port=8443,
-        url_path=TOKEN,
-        key='private.key',
-        cert='cert.pem',
-        webhook_url=f'https://{IP}:8443/{TOKEN}'
-    )
+# /del #
+@dp.message(text_startswith = '/del')
+async def del_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        user_id = message.text.replace('/del', '').strip()
+        cfg.remcode(users.data[user_id]['code'], "codes")
+        users.mod(user_id = user_id, key = '-',
+            code = ' ', acode = ' ')
+        await message.reply(lng.getmess(message, "user_del"))
+
+
+# /deladmin #
+@dp.message(text_startswith = '/deladmin')
+async def deladmin_mess(message: types.Message):
+    if users.super(message) == True and message.from_user.id == message.chat.id:
+        user_id = message.text.replace('/deladmin', '').strip()
+        cfg.remcode(users.data[user_id]['acode'], "acodes")
+        users.mod(user_id = user_id, acode = ' ')
+        await message.reply(lng.getmess(message, "adm_del"))
+
+
+# /mayday #
+@dp.message(commands = ['mayday'])
+async def mayday_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        key_yes = types.InlineKeyboardButton(text = '✅', callback_data = MaydayCallback(turn = 1).pack())
+        key_no = types.InlineKeyboardButton(text = '❌', callback_data = MaydayCallback(turn = 0).pack())
+        kb = types.InlineKeyboardMarkup(inline_keyboard = [[key_yes, key_no]])
+        if cfg.mayday == '0':
+            await message.reply(lng.getmess(message, "mayday_question_on"), parse_mode = "Markdown", reply_markup = kb)
+        elif cfg.mayday == '1':
+            await message.reply(lng.getmess(message, "mayday_question_off"), parse_mode = "Markdown", reply_markup = kb)
+
+
+# /login #
+@dp.message(commands = ['login'])
+async def login_mess(message: types.Message):
+    if users.getstatus(message) == Status.UNAUTH and message.from_user.id == message.chat.id:
+        users.mod(mess = message, key = '+')
+        await message.reply(lng.getmess(message, "login_wait"), parse_mode = "Markdown")
+
+
+# /logout #
+@dp.message(commands = ['logout'])
+async def logout_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH and message.from_user.id == message.chat.id:
+        users.mod(mess = message, key = '-')
+        await message.reply(lng.getmess(message, "logout"), parse_mode = "Markdown")
+
+
+# /lang #
+@dp.message(commands = ['lang'])
+async def lang_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH and message.from_user.id == message.chat.id:
+        langs = lng.langs()
+        keys = []
+        kbd = []
+        for l in langs:
+            if len(keys) < 3:
+                keys.append(types.InlineKeyboardButton(text = flag.flag(l), callback_data = LangCallback(lang = l).pack()))
+            else:
+                kbd.append(keys)
+                keys = []
+                keys.append(types.InlineKeyboardButton(text = flag.flag(l), callback_data = LangCallback(lang = l).pack()))
+        kbd.append(keys)
+        kb = types.InlineKeyboardMarkup(inline_keyboard = kbd)
+        await message.reply(lng.getmess(message, "lang_choose"), parse_mode = "Markdown", reply_markup = kb)
+
+
+# /vuln #
+@dp.message(commands = ['vuln'])
+async def vuln_mess(message: types.Message):
+    query = message.text.replace('/vuln', '').replace(f'@{BOT_USERNAME}', '').strip()
+    if msg := vuln_reactor(query):
+        await message.reply(msg, parse_mode = "Markdown")
+    else:
+        await message.reply(lng.getmess(message, "nothing"), parse_mode = "Markdown")
+
+
+# /remvuln #
+@dp.message(commands = ['remvuln'])
+async def remvuln_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        query = message.text.replace('/remvuln ', '').strip()
+        if changer(query, 0, 'vuln.data') == True:
+            await message.reply(lng.getmess(message, "removed"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
+
+
+# /addvuln #
+@dp.message(commands = ['addvuln'])
+async def addvuln_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        query = message.text.replace('/addvuln ', '').strip()
+        if changer(query, 1, 'vuln.data') == True:
+            await message.reply(lng.getmess(message, "added"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
+
+
+# /remcode #
+@dp.message(commands = ['remcode'])
+async def remcode_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        query = message.text.replace('/remcode ', '').strip()
+        if changer(query, 0, 'code.data') == True:
+            await message.reply(lng.getmess(message, "removed"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
+
+
+# /addcode #
+@dp.message(commands = ['addcode'])
+async def addcode_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        query = message.text.replace('/addcode ', '').strip()
+        if changer(query, 1, 'code.data') == True:
+            await message.reply(lng.getmess(message, "added"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
+
+
+# /remcost #
+@dp.message(commands = ['remcost'])
+async def remcost_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        query = message.text.replace('/remcost ', '').strip()
+        if changer(query, 0, 'cost.data') == True:
+            await message.reply(lng.getmess(message, "removed"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
+
+# /addcost #
+@dp.message(commands = ['addcost'])
+async def addcost_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        query = message.text.replace('/addcost ', '').strip()
+        if changer(query, 1, 'cost.data') == True:
+            await message.reply(lng.getmess(message, "added"), parse_mode = "Markdown")
+        else:
+            await message.reply(lng.getmess(message, "no_changes"), parse_mode = "Markdown")
+
+
+# /listcode #
+@dp.message(commands = ['listcode'])
+async def listcode_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        await message.reply(cost_code_reactor(message.text.replace('/listcode', '').strip(), 'code.data', full = True), parse_mode = "Markdown")
+
+
+# /listcost #
+@dp.message(commands = ['listcost'])
+async def listcode_mess(message: types.Message):
+    if users.admin(message) == True and message.from_user.id == message.chat.id:
+        await message.reply(cost_code_reactor(message.text.replace('/listcost', '').strip(), 'cost.data', full = True), parse_mode = "Markdown")
+
+
+# /pw, /pws #
+@dp.message(commands = ['pw', 'pws'])
+async def search_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        com = '/pws' if '/pws' in message.text else '/pw'
+        query = message.text.replace(com, '').replace(f'@{BOT_USERNAME}', '').strip()
+        if query == '':
+            await message.reply(lng.getmess(message, "empty"), parse_mode = "Markdown")
+        else:
+            try:
+                macs = [m for m in re.findall(MAC, query)]
+                for m in macs:
+                    query = query.replace(m, '').strip()
+            except:
+                query = query.strip()
+            finally:
+                    p = {'key': users.data[str(message.from_user.id)]['key'] if users.getstatus(message) == Status.AUTH else cfg.key, 
+                        'essid': query if query != [] else '*', 
+                        'bssid': [m for m in macs] if macs != [] else '*',
+                        'sens': True if com == '/pws' else False
+                        }
+                    r = requests.post(f'{SERVICE_URL}/api/apiquery', json = p).json()
+                    if r['result'] == True and r['data'] != []:
+                        order = ['essid', 'bssid', 'key', 'wps', 'time', 'lat', 'lon']
+                        prebuilt = {}
+                        built = ''
+                        result = r['data']
+                        for mac in result:
+                            for data in result[mac]:
+                                for item in order:
+                                    try:
+                                        if data[item] == '' or data[item] == '<empty>' or data[item] == None: pass
+                                        else: prebuilt[item] = data[item]
+                                    except: pass
+                                for every in prebuilt:
+                                    if every == 'time':
+                                        built += f'{lng.getmess(message, f"s_{every}") }:  `{datetime.strptime(prebuilt[every], "%Y-%m-%d %H:%M:%S").date()}`\n'
+                                    elif every == 'lat':
+                                        built += f'{lng.getmess(message, f"s_maps")}: '
+                                        built += f'[3WiFi]({SERVICE_URL}/map?lat={prebuilt["lat"]}&lon={prebuilt["lon"]}), '
+                                        built += f'[Google](https://www.google.com/maps/search/?api=1&query={prebuilt["lat"]},{prebuilt["lon"]})\n'
+                                    elif every == 'lon': pass
+                                    else: built += f'{lng.getmess(message, f"s_{every}")}:  `{prebuilt[every]}`\n'
+                                prebuilt = {}
+                                built += SEPARATOR
+                        await message.reply(built,
+                            parse_mode = "Markdown", disable_web_page_preview = True)
+                    else:
+                        button = types.InlineKeyboardButton(text = lng.getmess(message, 'wps_callback_start'), 
+                            callback_data = WpsCallback(wps = 1).pack())
+                        kbd = types.InlineKeyboardMarkup(inline_keyboard = [[button]])
+                        await message.reply(lng.getmess(message, 'nothing'), 
+                            parse_mode = "Markdown", reply_markup = kbd if len(macs) > 0 else None)
+
+
+# /wps #
+@dp.message(commands = ['wps'])
+async def wps_mess(message: types.Message, inline = None):
+    if users.getstatus(message if message else inline['message']) == Status.AUTH or users.getstatus(message if message else inline['message']) == Status.MAYDAY:
+        if inline:
+            query = inline['query']
+        else: 
+            query = message.text.replace('/wps', '').replace(f'@{BOT_USERNAME}', '').strip()
+        if query == '':
+            await message.reply(lng.getmess(message, "empty"), parse_mode = "Markdown")
+        else:
+            try:
+                macs = [m for m in re.findall(MAC, query)]
+            finally:
+                uid = str(message.from_user.id) if message else str(inline['message'].from_user.id)
+                p = {'key': users.data[uid]['key'] if users.getstatus(message if message else inline['message']) == Status.AUTH else cfg.key, 
+                    'bssid': [m for m in macs]}
+                r = requests.post(f'{SERVICE_URL}/api/apiwps', json = p).json()
+                if r['result'] == True and r['data'] != []:
+                    built = ''
+                    maxi = 10
+                    limiter = 0
+                    for every in r['data']:
+                        built += f'`{every}`\n'
+                        built += SEPARATOR
+                        for line in r['data'][every]:
+                            for data in r['data'][every][line]:
+                                if limiter < maxi:
+                                    limiter += 1
+                                else: break
+                                for attr in data:
+                                    if attr == 'fromdb': pass
+                                    elif attr == 'score':
+                                        built += f'{lng.getmess(message if message else inline["message"], f"w_{attr}")}: `{float(data[attr]) * 100:.2f}%`\n'
+                                    else:
+                                        built += f'{lng.getmess(message if message else inline["message"], f"w_{attr}")}: `{data[attr]}`\n'
+                                built += SEPARATOR
+                    if inline == None:
+                        await message.reply(built, parse_mode = "Markdown", disable_web_page_preview = True)
+                    else:
+                        return built
+                elif inline == None:
+                    await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
+                else:
+                    return lng.getmess(message, 'nothing_wps')
+
+
+# /wpsg #
+@dp.message(commands = ['wpsg'])
+async def wpsg_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        query = message.text.replace('/wps', '').replace(f'@{BOT_USERNAME}', '').strip()
+        if query == '':
+            await message.reply(lng.getmess(message, 'empty'), parse_mode = "Markdown")
+        else:
+            try:
+                mac = [m for m in re.findall(MAC, query)][0]
+            finally:
+                gen = wpspin.WPSpin()
+                gen = gen.getAll(mac)
+                built = f'<code>{mac}</code>\n'
+                built += SEPARATOR
+                for pin in gen:
+                    built += f'<code>{pin["name"]}</code>\n{lng.getmess(message, "w_value")}: <code>{pin["pin"]}</code>\n'
+                    built += SEPARATOR
+                await message.reply(built, parse_mode = "HTML")
+
+
+# /whatis #
+@dp.message(commands = ['whatis'])
+async def whatis_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        query = message.text.replace('/whatis', '').replace(f'@{BOT_USERNAME}', '').strip()
+        if query == '':
+            await message.reply(lng.getmess(message, 'empty'), parse_mode = "Markdown")
+        else:
+            try:
+                mac = [m for m in re.findall(MAC, query)][0]
+            finally:
+                uid = str(message.from_user.id)
+                p = {'key': users.data[uid]['key'] if users.getstatus(message) == Status.AUTH else cfg.key,
+                    'bssid': mac}
+                r = requests.post(f'{SERVICE_URL}/api/apidev', json = p).json()
+                if r['result'] == True and r['data'] != []:
+                    built = lng.getmess(message, "probably").format(mac = mac) + '\n'
+                    built += SEPARATOR
+                    for mac in r["data"]:
+                        for dev in r["data"][mac]:
+                            for s in dev:
+                                if s == 'score':
+                                    built += lng.getmess(message, f"w_{s}") + f": `{dev[s] * 100:.2f}`%\n"
+                                else:
+                                    built += lng.getmess(message, f"w_{s}") + f": `{dev[s]}`\n"
+                            built += SEPARATOR
+                    await message.reply(built, parse_mode = "Markdown")
+                else:
+                    await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
+
+
+# /where #
+@dp.message(commands = ['where'])
+async def where_mess(message: types.Message):
+    if users.getstatus(message) == Status.AUTH or users.getstatus(message) == Status.MAYDAY:
+        query = message.text.replace('/where ', '').replace(f'@{BOT_USERNAME}', '').strip()
+        if query == '':
+            await message.reply(lng.getmess(message, 'empty'), parse_mode = "Markdown")
+        else:
+            try:
+                mac = re.findall(MAC, query)[0]
+            finally:
+                out = subprocess.check_output(['geomac', mac]).decode('utf-8').split('\n')
+                if out[1] == 'no results':
+                    await message.reply(lng.getmess(message, 'nothing'), parse_mode = "Markdown")
+                else:
+                    splitter = out[1].split('|')[1].split(',')
+                    lat = splitter[0].strip()
+                    lon = splitter[1].strip()
+                    built = f'{mac}\n`{lat}, {lon}`\n{lng.getmess(message, "s_maps")}: '
+                    built += f'[3WiFi]({SERVICE_URL}/map?lat={lat}&lon={lon}), '
+                    built += f'[Google](https://www.google.com/maps/search/?api=1&query={lat},{lon})\n'
+                    await message.reply(built, parse_mode = "Markdown", disable_web_page_preview = True)
+                    await bot.send_location(message.chat.id, longitude = lon, latitude = lat, reply_to_message_id = message.message_id)
+
+
+# User login handler #
+@dp.message(F.func(lambda F: users.getstatus(F) == Status.LOGIN) & (F.from_user.id == F.chat.id))
+async def login_handler(message: types.Message):
+    users.mod(mess = message, key = f' {message.text}')
+    await message.reply(lng.getmess(message, "password_wait"), parse_mode = "Markdown")
+
+
+# User password handler #
+@dp.message((F.func(lambda F: users.getstatus(F) == Status.PASS)) & (F.from_user.id == F.chat.id))
+async def password_handler(message: types.Message):
+    try:
+        r = requests.post(f"{SERVICE_URL}/api/apikeys", json = {
+            'login': users.data[str(message.from_user.id)]['key'].strip(),
+            'password': message.text,
+            'genread': True}).json()
+        if r['result']:
+            if r['profile']['level'] > 0:
+                nick = r['profile']['nick']
+                for k in r['data']:
+                    if k['access'] == 'read':
+                        key = k['key']
+                        break
+                users.mod(message, key = key)
+                await message.reply(lng.getmess(message, "logged_in"), parse_mode = "Markdown")
+                for user in users.security(users.data[str(message.from_user.id)]['key']):
+                    if user != str(message.from_user.id):
+                        await bot.send_message(user, lng.getmessbyuid(user, "security").format(
+                            name = f'{message.from_user.first_name if message.from_user.first_name else ""} {message.from_user.last_name if message.from_user.last_name else ""}',
+                            uid = f'`{message.from_user.id}`',
+                            username = f"@{message.from_user.username}" if message.from_user.username else ""), parse_mode = "Markdown")
+        elif r['error'] == 'loginfail':
+            users.mod(message, key = '-')
+            await message.reply(lng.getmess(message, "bad_cred"))
+        elif r['error'] == 'lowlevel':
+            users.mod(message, key = '-')
+            await message.reply(lng.getmess(message, "banned"))
+    except:
+        pass
+
+
+# Mayday users and Admins handler #
+@dp.message((F.func(lambda F: F.text in users.freecodes() or F.text in users.freeacodes())) & (F.from_user.id == F.chat.id))
+async def add_admin_add_user_handler(message: types.Message):
+    if users.admin(message) == False:
+        if message.text in users.freecodes() and cfg.mayday == '1':
+            users.mod(mess = message , code = message.text)
+            await message.reply(lng.getmess(message, "bot_active"))
+        elif message.text in users.freeacodes():
+            users.mod(mess = message , acode = message.text)
+            await message.reply(lng.getmess(message, "admin_added"))
+
+
+# Egg or what? #
+@dp.message(F.from_user.id == F.chat.id)
+async def others_inside(message: types.Message):
+    if users.getstatus(message) == Status.UNAUTH:
+        await message.reply(lng.getmess(message, "auth_req"))
+    elif users.getstatus(message) == Status.AUTH:
+        mtl = message.text.lower()
+        if 'героям слава' in mtl or 'хейт лисички' in mtl or 'my name is jhon cina' in mtl:
+            await message.reply(lng.getmess(message, "egg"))
+
+
+# Reactor #
+@dp.message()
+async def others_outside(message: types.Message):
+    if users.getstatus(message) == Status.UNAUTH:
+        if cost_code_reactor(message.text, 'cost.data'):
+            await message.reply('Стоимость инвайта = 5$\nInvite price = 5$')
+        elif cost_code_reactor(message.text, 'code.data'):
+            await message.reply('[# Информация о покупке #](https://t.me/routerscan/145429)\n[# Purchase Information #](https://t.me/routerscan/145429)', parse_mode = "Markdown", disable_web_page_preview = True)
+
+
+# Language callback #
+@dp.callback_query(LangCallback.filter(F.lang.in_(lng.langs())))
+async def language_handler(query: types.CallbackQuery, callback_data: LangCallback):
+    to_edit_id = query.message.message_id
+    chat_id = query.message.chat.id
+    if query.message.reply_to_message.from_user.id == query.from_user.id:
+        users.mod(query, language = callback_data.lang)
+        await bot.edit_message_text(lng.getmess(query, "lang_chosen"), chat_id = chat_id, message_id = to_edit_id)
+
+
+# Mayday callback #
+@dp.callback_query(MaydayCallback.filter(F.turn.in_([0, 1])))
+async def mayday_handler(query: types.CallbackQuery, callback_data: MaydayCallback):
+    to_edit_id = query.message.message_id
+    chat_id = query.message.chat.id
+    if query.message.reply_to_message.from_user.id == query.from_user.id:
+        if cfg.mayday == '0':
+            if callback_data.turn == 0:
+                await bot.edit_message_text(lng.getmess(query, "okay"), 
+                    chat_id = chat_id, message_id = to_edit_id)
+            elif callback_data.turn == 1:
+                cfg.mayday = '1'
+                cfg.update()
+                await bot.edit_message_text(f'{lng.getmess(query, "mayday_state")}: `{lng.getmess(query, "on")}`', 
+                    chat_id = chat_id, message_id = to_edit_id, parse_mode = "Markdown")
+        elif cfg.mayday == '1':
+            if callback_data.turn == 0:
+                await bot.edit_message_text(lng.getmess(query, "okay"), 
+                    chat_id = chat_id, message_id = to_edit_id)
+            elif callback_data.turn == 1:
+                cfg.mayday = '0'
+                cfg.codes = [];
+                for u in users.data:
+                    users.mod(user_id = u, code = ' ')
+                cfg.update()
+                await bot.edit_message_text(f'{lng.getmess(query, "mayday_state")}: `{lng.getmess(query, "off")}`', 
+                    chat_id = chat_id, message_id = to_edit_id, parse_mode = "Markdown") 
+
+
+# WPS callback #
+@dp.callback_query(WpsCallback.filter(F.wps == 1))
+async def wps_handler(query: types.CallbackQuery, callback_data: WpsCallback):
+    to_edit_id = query.message.message_id
+    chat_id = query.message.chat.id
+    if query.from_user.id == query.message.reply_to_message.from_user.id:
+        inline = {'message':query.message.reply_to_message}
+        inline['query'] = query.message.reply_to_message.text.replace('/wps', '').replace(f'@{BOT_USERNAME}', '').strip()
+        await bot.edit_message_text(await wps_mess(None, inline = inline), chat_id = chat_id, message_id = to_edit_id, parse_mode = "Markdown", disable_web_page_preview = True)
+    else:
+        await bot.answer_callback_query(callback_query_id = query.id, text = lng.getmess(message, 'wps_callback_no'), show_alert = True)
+
+
+# Go go power rangers #
+if __name__ == '__main__':
+    dp.run_polling(bot)
